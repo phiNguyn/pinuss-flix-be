@@ -1,19 +1,24 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { authService } from '../services/index.js';
-import { authenticate } from '../services/jwt.service.js';
-import { updateProfileSchema, paginationSchema, UpdateProfileInput, PaginationInput } from './schemas/index.js';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { authService } from "../services/index.js";
+import { authenticate } from "../services/jwt.service.js";
+import {
+  updateProfileSchema,
+  paginationSchema,
+  UpdateProfileInput,
+  PaginationInput,
+} from "./schemas/index.js";
 
 export async function userRoutes(app: FastifyInstance): Promise<void> {
-  app.addHook('onRequest', authenticate);
+  app.addHook("onRequest", authenticate);
 
-  app.get('/me', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get("/me", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const user = await authService.findUserById(request.user.userId);
 
       if (!user) {
         return reply.status(404).send({
-          error: 'Not Found',
-          message: 'User not found',
+          error: "Not Found",
+          message: "User not found",
         });
       }
 
@@ -27,15 +32,15 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         updatedAt: user.updatedAt,
       });
     } catch (error) {
-      console.error('Get profile error:', error);
+      console.error("Get profile error:", error);
       return reply.status(500).send({
-        error: 'Internal Server Error',
-        message: 'Failed to get user profile',
+        error: "Internal Server Error",
+        message: "Failed to get user profile",
       });
     }
   });
 
-  app.patch('/me', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.patch("/me", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body = updateProfileSchema.parse(request.body);
       const { name, avatar } = body as UpdateProfileInput;
@@ -44,8 +49,8 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
 
       if (!user) {
         return reply.status(404).send({
-          error: 'Not Found',
-          message: 'User not found',
+          error: "Not Found",
+          message: "User not found",
         });
       }
 
@@ -64,21 +69,21 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         updatedAt: user.updatedAt,
       });
     } catch (error: any) {
-      if (error.name === 'ZodError') {
+      if (error.name === "ZodError") {
         return reply.status(400).send({
-          error: 'Validation Error',
+          error: "Validation Error",
           details: error.errors,
         });
       }
-      console.error('Update profile error:', error);
+      console.error("Update profile error:", error);
       return reply.status(500).send({
-        error: 'Internal Server Error',
-        message: 'Failed to update user profile',
+        error: "Internal Server Error",
+        message: "Failed to update user profile",
       });
     }
   });
 
-  app.get('/settings', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get("/settings", async (request: FastifyRequest, reply: FastifyReply) => {
     return reply.send({
       userId: request.user.userId,
       email: request.user.email,
