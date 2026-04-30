@@ -27,9 +27,16 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
           movieId: item.movieId,
           movieTitle: item.movieTitle,
           moviePoster: item.moviePoster,
+          originName: item.originName,
+          episodeCurrent: item.episodeCurrent,
+          year: item.year,
+          quality: item.quality,
           progress: item.progress,
           duration: item.duration,
           completed: item.completed,
+          currentEpSlug: item.currentEpSlug,
+          currentEpName: item.currentEpName,
+          source: item.source,
           watchedAt: item.watchedAt,
         })),
         pagination: {
@@ -66,9 +73,16 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
         movieId: result.movieId,
         movieTitle: result.movieTitle,
         moviePoster: result.moviePoster,
+        originName: result.originName,
+        episodeCurrent: result.episodeCurrent,
+        year: result.year,
+        quality: result.quality,
         progress: result.progress,
         duration: result.duration,
         completed: result.completed,
+        currentEpSlug: result.currentEpSlug,
+        currentEpName: result.currentEpName,
+        source: result.source,
         watchedAt: result.watchedAt,
       });
     } catch (error: any) {
@@ -96,9 +110,16 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
           movieId: item.movieId,
           movieTitle: item.movieTitle,
           moviePoster: item.moviePoster,
+          originName: item.originName,
+          episodeCurrent: item.episodeCurrent,
+          year: item.year,
+          quality: item.quality,
           progress: item.progress,
           duration: item.duration,
           completed: item.completed,
+          currentEpSlug: item.currentEpSlug,
+          currentEpName: item.currentEpName,
+          source: item.source,
           watchedAt: item.watchedAt,
         })),
       });
@@ -121,9 +142,16 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
           movieId: item.movieId,
           movieTitle: item.movieTitle,
           moviePoster: item.moviePoster,
+          originName: item.originName,
+          episodeCurrent: item.episodeCurrent,
+          year: item.year,
+          quality: item.quality,
           progress: item.progress,
           duration: item.duration,
           completed: item.completed,
+          currentEpSlug: item.currentEpSlug,
+          currentEpName: item.currentEpName,
+          source: item.source,
           watchedAt: item.watchedAt,
         })),
       });
@@ -155,9 +183,16 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
         movieId: result.movieId,
         movieTitle: result.movieTitle,
         moviePoster: result.moviePoster,
+        originName: result.originName,
+        episodeCurrent: result.episodeCurrent,
+        year: result.year,
+        quality: result.quality,
         progress: result.progress,
         duration: result.duration,
         completed: result.completed,
+        currentEpSlug: result.currentEpSlug,
+        currentEpName: result.currentEpName,
+        source: result.source,
         watchedAt: result.watchedAt,
       });
     } catch (error: any) {
@@ -183,24 +218,26 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
       const body = updateWatchHistorySchema.parse(request.body);
       const data = body as UpdateWatchHistoryInput;
 
+      // Use upsert to create if not exists
       const result = await watchHistoryService.update(request.user.userId, movieId, data);
 
-      if (!result) {
-        return reply.status(404).send({
-          error: 'Not Found',
-          message: 'Watch history not found',
-        });
-      }
-
+      // Since upsert is true, result should never be null
       return reply.send({
-        id: result._id,
-        movieId: result.movieId,
-        movieTitle: result.movieTitle,
-        moviePoster: result.moviePoster,
-        progress: result.progress,
-        duration: result.duration,
-        completed: result.completed,
-        watchedAt: result.watchedAt,
+        id: result!._id,
+        movieId: result!.movieId,
+        movieTitle: result!.movieTitle,
+        moviePoster: result!.moviePoster,
+        originName: result!.originName,
+        episodeCurrent: result!.episodeCurrent,
+        year: result!.year,
+        quality: result!.quality,
+        progress: result!.progress,
+        duration: result!.duration,
+        completed: result!.completed,
+        currentEpSlug: result!.currentEpSlug,
+        currentEpName: result!.currentEpName,
+        source: result!.source,
+        watchedAt: result!.watchedAt,
       });
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -222,7 +259,7 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
       const params = watchHistoryParamsSchema.parse(request.params);
       const { movieId } = params as WatchHistoryParams;
 
-      const deleted = await watchHistoryService.delete(request.user.userId, movieId);
+      const deleted = await watchHistoryService.softDelete(request.user.userId, movieId);
 
       if (!deleted) {
         return reply.status(404).send({
@@ -231,7 +268,7 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      return reply.send({ message: 'Watch history deleted successfully' });
+      return reply.send({ message: 'Watch history removed successfully' });
     } catch (error: any) {
       if (error.name === 'ZodError') {
         return reply.status(400).send({
@@ -249,10 +286,10 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete('/', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const deletedCount = await watchHistoryService.deleteAll(request.user.userId);
+      const deletedCount = await watchHistoryService.softDeleteAll(request.user.userId);
 
       return reply.send({
-        message: `Deleted ${deletedCount} watch history records`,
+        message: `Removed ${deletedCount} watch history records`,
         deletedCount,
       });
     } catch (error) {
@@ -260,6 +297,54 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(500).send({
         error: 'Internal Server Error',
         message: 'Failed to delete watch history',
+      });
+    }
+  });
+
+  // Restore endpoint - khôi phục một phim đã xóa
+  app.post('/restore/:movieId', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const params = watchHistoryParamsSchema.parse(request.params);
+      const { movieId } = params as WatchHistoryParams;
+
+      const result = await watchHistoryService.restore(request.user.userId, movieId);
+
+      if (!result) {
+        return reply.status(404).send({
+          error: 'Not Found',
+          message: 'No deleted watch history found for this movie',
+        });
+      }
+
+      return reply.status(200).send({
+        id: result._id,
+        movieId: result.movieId,
+        movieTitle: result.movieTitle,
+        moviePoster: result.moviePoster,
+        originName: result.originName,
+        episodeCurrent: result.episodeCurrent,
+        year: result.year,
+        quality: result.quality,
+        progress: result.progress,
+        duration: result.duration,
+        completed: result.completed,
+        currentEpSlug: result.currentEpSlug,
+        currentEpName: result.currentEpName,
+        source: result.source,
+        watchedAt: result.watchedAt,
+        message: 'Watch history restored successfully',
+      });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return reply.status(400).send({
+          error: 'Validation Error',
+          details: error.errors,
+        });
+      }
+      console.error('Restore watch history error:', error);
+      return reply.status(500).send({
+        error: 'Internal Server Error',
+        message: 'Failed to restore watch history',
       });
     }
   });

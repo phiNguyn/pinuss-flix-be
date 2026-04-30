@@ -25,10 +25,10 @@ export async function registerJwt(app: FastifyInstance): Promise<void> {
 
 export function generateTokens(app: FastifyInstance, payload: JwtPayload): TokenPair {
   const accessToken = app.jwt.sign(payload);
-  const refreshToken = app.jwt.sign(payload, {
-    secret: env.JWT_REFRESH_SECRET,
-    expiresIn: env.JWT_REFRESH_EXPIRES_IN,
-  });
+const refreshToken = app.jwt.sign(payload, {
+      key: env.JWT_REFRESH_SECRET,
+      expiresIn: env.JWT_REFRESH_EXPIRES_IN,
+    });
 
   return { accessToken, refreshToken };
 }
@@ -38,7 +38,7 @@ export function generateAccessToken(app: FastifyInstance, payload: JwtPayload): 
 }
 
 export function verifyRefreshToken(app: FastifyInstance, token: string): JwtPayload {
-  return app.jwt.verify(token, { secret: env.JWT_REFRESH_SECRET });
+  return app.jwt.verify(token, { key: env.JWT_REFRESH_SECRET });
 }
 
 export async function authenticate(
@@ -49,11 +49,5 @@ export async function authenticate(
     await request.jwtVerify();
   } catch (err) {
     reply.status(401).send({ error: 'Unauthorized', message: 'Invalid or expired token' });
-  }
-}
-
-declare module 'fastify' {
-  interface FastifyRequest {
-    user: JwtPayload;
   }
 }

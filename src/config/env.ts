@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const envSchema = z.object({
   PORT: z.string().default("3000"),
-  MONGODB_URI: z.string().default("mongodb://localhost:27017/movie-app"),
+  MONGODB_URI: z.string().default(`${process.env.DATABASE_URL}/movie-app`),
   JWT_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default("15m"),
