@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const envSchema = z.object({
   PORT: z.string().default("3000"),
-  MONGODB_URI: z.string().default(`${process.env.DATABASE_URL}/movie-app`),
+  MONGODB_URI: z.string().default(`${process.env.MONGODB_URI}/movie-app`),
   JWT_SECRET: z.string().min(1).default("dev-secret"),
   JWT_REFRESH_SECRET: z.string().min(1).default("dev-refresh-secret"),
   JWT_EXPIRES_IN: z.string().default("15m"),
@@ -33,7 +33,10 @@ export function loadEnv(): EnvConfig {
   });
 
   if (!parsed.success) {
-    console.warn("Invalid environment variables, using defaults:", parsed.error.flatten());
+    console.warn(
+      "Invalid environment variables, using defaults:",
+      parsed.error.flatten(),
+    );
   }
 
   env = parsed.success ? parsed.data : envSchema.parse({});

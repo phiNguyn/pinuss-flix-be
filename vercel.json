@@ -11,13 +11,5 @@
       "src": "/(.*)",
       "dest": "src/vercel.ts"
     }
-  ],
-  "env": {
-    "DATABASE_URL": "@database_url",
-    "JWT_SECRET": "@jwt_secret",
-    "JWT_REFRESH_SECRET": "@jwt_refresh_secret",
-    "GOOGLE_CLIENT_ID": "@google_client_id",
-    "GOOGLE_CLIENT_SECRET": "@google_client_secret",
-    "FRONTEND_URL": "@frontend_url"
-  }
+  ]
 }
