@@ -4,7 +4,7 @@ import cors from "@fastify/cors";
 import { loadEnv } from "./config/env.js";
 import { connectDatabase } from "./config/database.js";
 import { registerJwt, authenticate } from "./services/jwt.service.js";
-import { authRoutes, userRoutes, watchHistoryRoutes } from "./routes/index.js";
+import { authRoutes, userRoutes, watchHistoryRoutes, commentRoutes } from "./routes/index.js";
 
 const env = loadEnv();
 
@@ -34,6 +34,7 @@ async function build(): Promise<typeof app> {
   await app.register(authRoutes, { prefix: "/api/v1/auth" });
   await app.register(userRoutes, { prefix: "/api/v1/users" });
   await app.register(watchHistoryRoutes, { prefix: "/api/v1/watch-history" });
+  await app.register(commentRoutes, { prefix: "/api/v1/comments" });
 
   app.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
@@ -47,6 +48,7 @@ async function build(): Promise<typeof app> {
         auth: "/api/v1/auth",
         users: "/api/v1/users",
         watchHistory: "/api/v1/watch-history",
+        comments: "/api/v1/comments",
         health: "/health",
       },
     };
