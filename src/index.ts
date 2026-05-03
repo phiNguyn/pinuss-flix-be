@@ -23,10 +23,10 @@ const app = Fastify({
 
 async function build(): Promise<typeof app> {
   await app.register(cors, {
-    origin: env.FRONTEND_URL,
+    origin: JSON.parse(env.FRONTEND_URL || "[]"),
     credentials: true,
   });
-
+  
   await registerJwt(app);
 
   app.decorate("authenticate", authenticate);

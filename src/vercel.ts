@@ -1,4 +1,4 @@
-import Fastify, { FastifyRequest, FastifyReply } from "fastify";
+import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { connectDatabase } from "./config/database.js";
 
@@ -11,7 +11,7 @@ async function getApp() {
   app = Fastify({ logger: false });
 
   await app.register(cors, {
-    origin: process.env.FRONTEND_URL,
+    origin: JSON.parse(process.env.FRONTEND_URL || "[]"),
     credentials: true,
   });
 
