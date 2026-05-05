@@ -9,6 +9,7 @@ import {
   WatchHistoryParams,
   paginationSchema,
   PaginationInput,
+  bulkCreateWatchHistorySchema,
 } from './schemas/index.js';
 
 export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
@@ -96,6 +97,36 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(500).send({
         error: 'Internal Server Error',
         message: 'Failed to create watch history',
+      });
+    }
+  });
+
+  // Bulk create or update watch history - for syncing local history on login
+  app.post('/bulk', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const body = bulkCreateWatchHistorySchema.parse(request.body);
+
+      const result = await watchHistoryService.bulkCreateOrUpdate(
+        request.user.userId,
+        body.items
+      );
+
+      return reply.status(201).send({
+        message: `Successfully synced ${result.upsertedCount} watch history items`,
+        insertedCount: result.insertedCount,
+        upsertedCount: result.upsertedCount,
+      });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return reply.status(400).send({
+          error: 'Validation Error',
+          details: error.errors,
+        });
+      }
+      console.error('Bulk create watch history error:', error);
+      return reply.status(500).send({
+        error: 'Internal Server Error',
+        message: 'Failed to bulk create watch history',
       });
     }
   });

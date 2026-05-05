@@ -38,6 +38,10 @@ export const updateWatchHistorySchema = z.object({
   source: z.enum(['ophim', 'phimapi', 'nguonc']).optional(),
 });
 
+export const bulkCreateWatchHistorySchema = z.object({
+  items: z.array(createWatchHistorySchema).min(1).max(100),
+});
+
 export const watchHistoryParamsSchema = z.object({
   movieId: z.string().min(1, 'Movie ID is required'),
 });

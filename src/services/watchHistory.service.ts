@@ -193,6 +193,53 @@ export class WatchHistoryService {
       .sort({ watchedAt: -1 })
       .limit(limit);
   }
+
+  async bulkCreateOrUpdate(
+    userId: string,
+    items: CreateWatchHistoryDto[]
+  ): Promise<{ insertedCount: number; upsertedCount: number }> {
+    if (items.length === 0) {
+      return { insertedCount: 0, upsertedCount: 0 };
+    }
+
+    const userObjectId = new Types.ObjectId(userId);
+    const now = new Date();
+
+    const operations = items.map((item) => ({
+      updateOne: {
+        filter: {
+          userId: userObjectId,
+          movieId: item.movieId,
+        },
+        update: {
+          $set: {
+            movieTitle: item.movieTitle,
+            moviePoster: item.moviePoster,
+            originName: item.originName,
+            episodeCurrent: item.episodeCurrent,
+            year: item.year,
+            quality: item.quality,
+            progress: item.progress,
+            duration: item.duration,
+            completed: item.completed ?? false,
+            currentEpSlug: item.currentEpSlug,
+            currentEpName: item.currentEpName,
+            source: item.source ?? 'ophim',
+            watchedAt: now,
+            deletedAt: null,
+          },
+        },
+        upsert: true,
+      },
+    }));
+
+    const result = await WatchHistory.bulkWrite(operations, { ordered: false });
+
+    return {
+      insertedCount: result.upsertedCount,
+      upsertedCount: result.upsertedCount,
+    };
+  }
 }
 
 export const watchHistoryService = new WatchHistoryService();
