@@ -1,0 +1,313 @@
+import { MovieViewLog, IMovieViewLog, ViewAction, ViewSource } from "../models/index.js";
+import { Types } from "mongoose";
+import https from "https";
+
+export interface CreateViewLogDto {
+  movieId: string;
+  action: ViewAction;
+  source?: ViewSource;
+  sessionId?: string;
+  userId?: string;
+  metadata?: {
+    episodeSlug?: string;
+    episodeName?: string;
+    progress?: number;
+    duration?: number;
+  };
+}
+
+export interface TrendingMovieResult {
+  movieId: string;
+  movieTitle?: string;
+  moviePoster?: string;
+  year?: number;
+  quality?: string;
+  viewCount: number;
+  source: ViewSource;
+  lastViewed: Date;
+}
+
+// Cache for movie details (simple in-memory cache)
+const movieCache = new Map<string, { data: any; expiresAt: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function fetchMovieFromOphim(movieId: string): Promise<{
+  name: string;
+  origin_name: string;
+  thumb_url: string;
+  poster_url: string;
+  year: number;
+  quality: string;
+} | null> {
+  // Check cache first
+  const cached = movieCache.get(movieId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
+
+  try {
+    const data = await new Promise<any>((resolve, reject) => {
+      const url = `https://ophim1.com/phim/${movieId}`;
+      https.get(url, (res) => {
+        let body = "";
+        res.on("data", (chunk) => (body += chunk));
+        res.on("end", () => {
+          try {
+            resolve(JSON.parse(body));
+          } catch {
+            reject(new Error("Invalid JSON response"));
+          }
+        });
+      }).on("error", reject);
+    });
+
+    if (data?.status && data?.movie) {
+      const movieData = {
+        name: data.movie.name,
+        origin_name: data.movie.origin_name,
+        thumb_url: data.movie.thumb_url,
+        poster_url: data.movie.poster_url,
+        year: data.movie.year,
+        quality: data.movie.quality,
+      };
+
+      // Cache the result
+      movieCache.set(movieId, { data: movieData, expiresAt: Date.now() + CACHE_TTL });
+
+      return movieData;
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`Failed to fetch movie ${movieId} from Ophim:`, error);
+    return null;
+  }
+}
+
+export class MovieViewLogService {
+  /**
+   * Log a view event (for both anonymous and logged in users)
+   */
+  async logView(data: CreateViewLogDto): Promise<IMovieViewLog> {
+    const log = new MovieViewLog({
+      movieId: data.movieId,
+      action: data.action,
+      source: data.source ?? "ophim",
+      sessionId: data.sessionId,
+      userId: data.userId,
+      metadata: data.metadata,
+      viewedAt: new Date(),
+    });
+
+    return log.save();
+  }
+
+  /**
+   * Get trending movies based on view logs
+   * @param limit - Number of movies to return
+   * @param hoursBack - How many hours back to look (default: 24 hours)
+   */
+  async getTrendingMovies(
+    limit: number = 10,
+    hoursBack: number = 24
+  ): Promise<TrendingMovieResult[]> {
+    const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
+
+    const trending = await MovieViewLog.aggregate([
+      {
+        $match: {
+          viewedAt: { $gte: since },
+          action: { $in: ["view", "complete"] }, // Chỉ đếm view và complete
+        },
+      },
+      {
+        $group: {
+          _id: "$movieId",
+          viewCount: { $sum: 1 },
+          source: { $last: "$source" },
+          lastViewed: { $max: "$viewedAt" },
+        },
+      },
+      { $sort: { viewCount: -1 } },
+      { $limit: limit },
+    ]);
+
+    // Enrich with movie details (only for ophim source)
+    const enrichedResults: TrendingMovieResult[] = await Promise.all(
+      trending.map(async (item) => {
+        const result: TrendingMovieResult = {
+          movieId: item._id as string,
+          viewCount: item.viewCount,
+          source: item.source,
+          lastViewed: item.lastViewed,
+        };
+
+        // Fetch movie details for ophim source
+        if (item.source === "ophim") {
+          const movieData = await fetchMovieFromOphim(item._id as string);
+          if (movieData) {
+            result.movieTitle = movieData.name;
+            result.moviePoster = movieData.thumb_url;
+            result.year = movieData.year;
+            result.quality = movieData.quality;
+          }
+        }
+
+        return result;
+      })
+    );
+
+    return enrichedResults;
+  }
+
+  /**
+   * Get movie statistics
+   */
+  async getMovieStats(movieId: string): Promise<{
+    totalViews: number;
+    views24h: number;
+    views7d: number;
+    favorites: number;
+    watchlist: number;
+  }> {
+    const now = new Date();
+    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const [stats] = await MovieViewLog.aggregate([
+      { $match: { movieId } },
+      {
+        $group: {
+          _id: "$action",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const statsMap = stats.reduce(
+      (acc: Record<string, number>, curr: { _id: string; count: number }) => {
+        acc[curr._id] = curr.count;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    const views24h = await MovieViewLog.countDocuments({
+      movieId,
+      action: { $in: ["view", "complete"] },
+      viewedAt: { $gte: last24h },
+    });
+
+    const views7d = await MovieViewLog.countDocuments({
+      movieId,
+      action: { $in: ["view", "complete"] },
+      viewedAt: { $gte: last7d },
+    });
+
+    return {
+      totalViews: (statsMap["view"] || 0) + (statsMap["complete"] || 0),
+      views24h,
+      views7d,
+      favorites: statsMap["favorite"] || 0,
+      watchlist: statsMap["watchlist"] || 0,
+    };
+  }
+
+  /**
+   * Merge anonymous session data to user when they login/register
+   */
+  async mergeSessionToUser(
+    sessionId: string,
+    userId: string
+  ): Promise<{ mergedCount: number }> {
+    if (!sessionId || !userId) {
+      return { mergedCount: 0 };
+    }
+
+    // Update all logs from this session to add userId
+    // Keep sessionId for analytics purposes
+    const result = await MovieViewLog.updateMany(
+      { sessionId, userId: { $exists: false } },
+      {
+        $set: {
+          userId,
+          viewedAt: new Date(), // Update viewedAt to reflect merge time
+        },
+      }
+    );
+
+    return { mergedCount: result.modifiedCount };
+  }
+
+  /**
+   * Get user view history (logged in users only)
+   */
+  async getUserViewHistory(
+    userId: string,
+    options: { page?: number; limit?: number } = {}
+  ): Promise<{
+    data: IMovieViewLog[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const { page = 1, limit = 20 } = options;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      MovieViewLog.find({ userId })
+        .sort({ viewedAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      MovieViewLog.countDocuments({ userId }),
+    ]);
+
+    return { data, total, page, limit };
+  }
+
+  /**
+   * Get session view history (anonymous users)
+   */
+  async getSessionViewHistory(
+    sessionId: string,
+    options: { page?: number; limit?: number } = {}
+  ): Promise<{
+    data: IMovieViewLog[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const { page = 1, limit = 20 } = options;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      MovieViewLog.find({ sessionId, userId: { $exists: false } })
+        .sort({ viewedAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      MovieViewLog.countDocuments({
+        sessionId,
+        userId: { $exists: false },
+      }),
+    ]);
+
+    return { data, total, page, limit };
+  }
+
+  /**
+   * Clean up old anonymous data (optional, for data retention)
+   */
+  async cleanupOldAnonymousData(daysOld: number = 90): Promise<number> {
+    const cutoff = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
+
+    const result = await MovieViewLog.deleteMany({
+      sessionId: { $exists: true, $ne: null },
+      userId: { $exists: false },
+      viewedAt: { $lt: cutoff },
+    });
+
+    return result.deletedCount;
+  }
+}
+
+export const movieViewLogService = new MovieViewLogService();

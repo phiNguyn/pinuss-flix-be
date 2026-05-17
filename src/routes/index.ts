@@ -2,3 +2,6 @@ export { authRoutes } from './auth.routes.js';
 export { userRoutes } from './user.routes.js';
 export { watchHistoryRoutes } from './watchHistory.routes.js';
 export { commentRoutes } from './comment.routes.js';
+export { movieViewLogRoutes } from './movieViewLog.routes.js';
+export { adminRoutes } from './admin.routes.js';
+export { feedbackRoutes } from './feedback.routes.js';

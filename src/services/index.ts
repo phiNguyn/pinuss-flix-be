@@ -20,3 +20,25 @@ export {
   CreateWatchHistoryDto,
   UpdateWatchHistoryDto,
 } from './watchHistory.service.js';
+
+export {
+  movieViewLogService,
+  MovieViewLogService,
+  CreateViewLogDto,
+  TrendingMovieResult,
+} from './movieViewLog.service.js';
+
+export {
+  adminService,
+  AdminService,
+  AdminStats,
+  UserListResult,
+  UserWatchHistoryResult,
+} from './admin.service.js';
+
+export {
+  feedbackService,
+  FeedbackService,
+  CreateFeedbackDto,
+  FeedbackListResult,
+} from './feedback.service.js';

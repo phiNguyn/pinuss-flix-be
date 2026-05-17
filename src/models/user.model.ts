@@ -5,6 +5,11 @@ export enum Provider {
   GOOGLE = 'google',
 }
 
+export enum UserRole {
+  USER = 'user',
+  ADMIN = 'admin',
+}
+
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
   email: string;
@@ -12,6 +17,7 @@ export interface IUser extends Document {
   name?: string;
   username?: string;
   avatar?: string;
+  role: UserRole;
   provider: Provider;
   googleId?: string;
   isActive: boolean;
@@ -48,6 +54,11 @@ const userSchema = new Schema<IUser>(
     avatar: {
       type: String,
     },
+    role: {
+      type: String,
+      enum: Object.values(UserRole),
+      default: UserRole.USER,
+    },
     provider: {
       type: String,
       enum: Object.values(Provider),
@@ -67,5 +78,9 @@ const userSchema = new Schema<IUser>(
     timestamps: true,
   }
 );
+
+// Index for role-based queries
+userSchema.index({ role: 1 });
+userSchema.index({ email: 1 });
 
 export const User = mongoose.model<IUser>('User', userSchema);

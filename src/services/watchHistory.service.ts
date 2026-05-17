@@ -40,9 +40,54 @@ export interface UpdateWatchHistoryDto {
 }
 
 export class WatchHistoryService {
+  async getTrendingMovies(limit: number = 10): Promise<
+    {
+      movieId: string;
+      movieTitle: string;
+      moviePoster?: string;
+      year?: number;
+      quality?: string;
+      watchCount: number;
+    }[]
+  > {
+    const result = await WatchHistory.aggregate([
+      // Chỉ lấy những record chưa bị xóa
+      // { $match: { deletedAt: null } },
+      // Nhóm theo movieId
+      {
+        $group: {
+          _id: "$movieId",
+          movieTitle: { $first: "$movieTitle" },
+          moviePoster: { $first: "$moviePoster" },
+          year: { $first: "$year" },
+          quality: { $first: "$quality" },
+          watchCount: { $sum: 1 },
+        },
+      },
+      // Sắp xếp theo watchCount giảm dần
+      { $sort: { watchCount: -1 } },
+      // Giới hạn kết quả
+      { $limit: limit },
+      // Đổi tên field cho đẹp
+      {
+        $project: {
+          _id: 0,
+          movieId: "$_id",
+          movieTitle: 1,
+          moviePoster: 1,
+          year: 1,
+          quality: 1,
+          watchCount: 1,
+        },
+      },
+    ]);
+
+    return result;
+  }
+
   async createOrUpdate(
     userId: string,
-    data: CreateWatchHistoryDto
+    data: CreateWatchHistoryDto,
   ): Promise<IWatchHistory> {
     const result = await WatchHistory.findOneAndUpdate(
       {
@@ -64,13 +109,13 @@ export class WatchHistoryService {
           completed: data.completed ?? false,
           currentEpSlug: data.currentEpSlug,
           currentEpName: data.currentEpName,
-          source: data.source ?? 'ophim',
+          source: data.source ?? "ophim",
           watchedAt: new Date(),
           // Khôi phục nếu đã bị xóa mềm
           deletedAt: null,
         },
       },
-      { upsert: true, new: true, runValidators: true }
+      { upsert: true, new: true, runValidators: true },
     );
 
     return result;
@@ -79,7 +124,7 @@ export class WatchHistoryService {
   async update(
     userId: string,
     movieId: string,
-    data: UpdateWatchHistoryDto
+    data: UpdateWatchHistoryDto,
   ): Promise<IWatchHistory | null> {
     return WatchHistory.findOneAndUpdate(
       { userId: new Types.ObjectId(userId), movieId },
@@ -89,34 +134,41 @@ export class WatchHistoryService {
           watchedAt: new Date(),
         },
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
   }
 
   async getByUserId(
     userId: string,
-    options: { page?: number; limit?: number; includeDeleted?: boolean } = {}
-  ): Promise<{ data: IWatchHistory[]; total: number; page: number; limit: number }> {
+    options: { page?: number; limit?: number; includeDeleted?: boolean } = {},
+  ): Promise<{
+    data: IWatchHistory[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     const { page = 1, limit = 20, includeDeleted = false } = options;
     const skip = (page - 1) * limit;
 
-    const filter: Record<string, unknown> = { userId: new Types.ObjectId(userId) };
+    const filter: Record<string, unknown> = {
+      userId: new Types.ObjectId(userId),
+    };
     if (!includeDeleted) {
       filter.deletedAt = null;
     }
 
     const [data, total] = await Promise.all([
-      WatchHistory.find(filter)
-        .sort({ watchedAt: -1 })
-        .skip(skip)
-        .limit(limit),
+      WatchHistory.find(filter).sort({ watchedAt: -1 }).skip(skip).limit(limit),
       WatchHistory.countDocuments(filter),
     ]);
 
     return { data, total, page, limit };
   }
 
-  async getByMovieId(userId: string, movieId: string): Promise<IWatchHistory | null> {
+  async getByMovieId(
+    userId: string,
+    movieId: string,
+  ): Promise<IWatchHistory | null> {
     return WatchHistory.findOne({
       userId: new Types.ObjectId(userId),
       movieId,
@@ -133,12 +185,15 @@ export class WatchHistoryService {
       },
       {
         $set: { deletedAt: new Date() },
-      }
+      },
     );
     return !!result;
   }
 
-  async restore(userId: string, movieId: string): Promise<IWatchHistory | null> {
+  async restore(
+    userId: string,
+    movieId: string,
+  ): Promise<IWatchHistory | null> {
     return WatchHistory.findOneAndUpdate(
       {
         userId: new Types.ObjectId(userId),
@@ -151,7 +206,7 @@ export class WatchHistoryService {
           watchedAt: new Date(),
         },
       },
-      { new: true }
+      { new: true },
     );
   }
 
@@ -163,14 +218,14 @@ export class WatchHistoryService {
       },
       {
         $set: { deletedAt: new Date() },
-      }
+      },
     );
     return result.modifiedCount;
   }
 
   async getRecentlyWatched(
     userId: string,
-    limit: number = 10
+    limit: number = 10,
   ): Promise<IWatchHistory[]> {
     return WatchHistory.find({
       userId: new Types.ObjectId(userId),
@@ -182,7 +237,7 @@ export class WatchHistoryService {
 
   async getContinueWatching(
     userId: string,
-    limit: number = 10
+    limit: number = 10,
   ): Promise<IWatchHistory[]> {
     return WatchHistory.find({
       userId: new Types.ObjectId(userId),
@@ -196,7 +251,7 @@ export class WatchHistoryService {
 
   async bulkCreateOrUpdate(
     userId: string,
-    items: CreateWatchHistoryDto[]
+    items: CreateWatchHistoryDto[],
   ): Promise<{ insertedCount: number; upsertedCount: number }> {
     if (items.length === 0) {
       return { insertedCount: 0, upsertedCount: 0 };
@@ -224,7 +279,7 @@ export class WatchHistoryService {
             completed: item.completed ?? false,
             currentEpSlug: item.currentEpSlug,
             currentEpName: item.currentEpName,
-            source: item.source ?? 'ophim',
+            source: item.source ?? "ophim",
             watchedAt: now,
             deletedAt: null,
           },

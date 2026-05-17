@@ -13,14 +13,20 @@ import {
 } from './schemas/index.js';
 
 export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
-  app.addHook('onRequest', authenticate);
+ 
 
-  app.get('/', async (request: FastifyRequest, reply: FastifyReply) => {
+
+  app.addHook("onRequest", authenticate);
+
+  app.get("/", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const query = paginationSchema.parse(request.query);
       const { page, limit } = query as PaginationInput;
 
-      const result = await watchHistoryService.getByUserId(request.user.userId, { page, limit });
+      const result = await watchHistoryService.getByUserId(
+        request.user.userId,
+        { page, limit },
+      );
 
       return reply.send({
         data: result.data.map((item) => ({
@@ -48,26 +54,29 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
         },
       });
     } catch (error: any) {
-      if (error.name === 'ZodError') {
+      if (error.name === "ZodError") {
         return reply.status(400).send({
-          error: 'Validation Error',
+          error: "Validation Error",
           details: error.errors,
         });
       }
-      console.error('Get watch history error:', error);
+      console.error("Get watch history error:", error);
       return reply.status(500).send({
-        error: 'Internal Server Error',
-        message: 'Failed to get watch history',
+        error: "Internal Server Error",
+        message: "Failed to get watch history",
       });
     }
   });
 
-  app.post('/', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post("/", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body = createWatchHistorySchema.parse(request.body);
       const data = body as CreateWatchHistoryInput;
 
-      const result = await watchHistoryService.createOrUpdate(request.user.userId, data);
+      const result = await watchHistoryService.createOrUpdate(
+        request.user.userId,
+        data,
+      );
 
       return reply.status(201).send({
         id: result._id,
@@ -87,28 +96,28 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
         watchedAt: result.watchedAt,
       });
     } catch (error: any) {
-      if (error.name === 'ZodError') {
+      if (error.name === "ZodError") {
         return reply.status(400).send({
-          error: 'Validation Error',
+          error: "Validation Error",
           details: error.errors,
         });
       }
-      console.error('Create watch history error:', error);
+      console.error("Create watch history error:", error);
       return reply.status(500).send({
-        error: 'Internal Server Error',
-        message: 'Failed to create watch history',
+        error: "Internal Server Error",
+        message: "Failed to create watch history",
       });
     }
   });
 
   // Bulk create or update watch history - for syncing local history on login
-  app.post('/bulk', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post("/bulk", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body = bulkCreateWatchHistorySchema.parse(request.body);
 
       const result = await watchHistoryService.bulkCreateOrUpdate(
         request.user.userId,
-        body.items
+        body.items,
       );
 
       return reply.status(201).send({
@@ -117,23 +126,26 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
         upsertedCount: result.upsertedCount,
       });
     } catch (error: any) {
-      if (error.name === 'ZodError') {
+      if (error.name === "ZodError") {
         return reply.status(400).send({
-          error: 'Validation Error',
+          error: "Validation Error",
           details: error.errors,
         });
       }
-      console.error('Bulk create watch history error:', error);
+      console.error("Bulk create watch history error:", error);
       return reply.status(500).send({
-        error: 'Internal Server Error',
-        message: 'Failed to bulk create watch history',
+        error: "Internal Server Error",
+        message: "Failed to bulk create watch history",
       });
     }
   });
 
-  app.get('/recent', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get("/recent", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const result = await watchHistoryService.getRecentlyWatched(request.user.userId, 10);
+      const result = await watchHistoryService.getRecentlyWatched(
+        request.user.userId,
+        10,
+      );
 
       return reply.send({
         data: result.map((item) => ({
@@ -155,17 +167,20 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
         })),
       });
     } catch (error) {
-      console.error('Get recent watch history error:', error);
+      console.error("Get recent watch history error:", error);
       return reply.status(500).send({
-        error: 'Internal Server Error',
-        message: 'Failed to get recent watch history',
+        error: "Internal Server Error",
+        message: "Failed to get recent watch history",
       });
     }
   });
 
-  app.get('/continue', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get("/continue", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const result = await watchHistoryService.getContinueWatching(request.user.userId, 10);
+      const result = await watchHistoryService.getContinueWatching(
+        request.user.userId,
+        10,
+      );
 
       return reply.send({
         data: result.map((item) => ({
@@ -187,25 +202,28 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
         })),
       });
     } catch (error) {
-      console.error('Get continue watching error:', error);
+      console.error("Get continue watching error:", error);
       return reply.status(500).send({
-        error: 'Internal Server Error',
-        message: 'Failed to get continue watching list',
+        error: "Internal Server Error",
+        message: "Failed to get continue watching list",
       });
     }
   });
 
-  app.get('/:movieId', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get("/:movieId", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const params = watchHistoryParamsSchema.parse(request.params);
       const { movieId } = params as WatchHistoryParams;
 
-      const result = await watchHistoryService.getByMovieId(request.user.userId, movieId);
+      const result = await watchHistoryService.getByMovieId(
+        request.user.userId,
+        movieId,
+      );
 
       if (!result) {
         return reply.status(404).send({
-          error: 'Not Found',
-          message: 'Watch history not found',
+          error: "Not Found",
+          message: "Watch history not found",
         });
       }
 
@@ -227,156 +245,178 @@ export async function watchHistoryRoutes(app: FastifyInstance): Promise<void> {
         watchedAt: result.watchedAt,
       });
     } catch (error: any) {
-      if (error.name === 'ZodError') {
+      if (error.name === "ZodError") {
         return reply.status(400).send({
-          error: 'Validation Error',
+          error: "Validation Error",
           details: error.errors,
         });
       }
-      console.error('Get watch history by movie error:', error);
+      console.error("Get watch history by movie error:", error);
       return reply.status(500).send({
-        error: 'Internal Server Error',
-        message: 'Failed to get watch history',
+        error: "Internal Server Error",
+        message: "Failed to get watch history",
       });
     }
   });
 
-  app.patch('/:movieId', async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const params = watchHistoryParamsSchema.parse(request.params);
-      const { movieId } = params as WatchHistoryParams;
+  app.patch(
+    "/:movieId",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const params = watchHistoryParamsSchema.parse(request.params);
+        const { movieId } = params as WatchHistoryParams;
 
-      const body = updateWatchHistorySchema.parse(request.body);
-      const data = body as UpdateWatchHistoryInput;
+        const body = updateWatchHistorySchema.parse(request.body);
+        const data = body as UpdateWatchHistoryInput;
 
-      // Use upsert to create if not exists
-      const result = await watchHistoryService.update(request.user.userId, movieId, data);
+        // Use upsert to create if not exists
+        const result = await watchHistoryService.update(
+          request.user.userId,
+          movieId,
+          data,
+        );
 
-      // Since upsert is true, result should never be null
-      return reply.send({
-        id: result!._id,
-        movieId: result!.movieId,
-        movieTitle: result!.movieTitle,
-        moviePoster: result!.moviePoster,
-        originName: result!.originName,
-        episodeCurrent: result!.episodeCurrent,
-        year: result!.year,
-        quality: result!.quality,
-        progress: result!.progress,
-        duration: result!.duration,
-        completed: result!.completed,
-        currentEpSlug: result!.currentEpSlug,
-        currentEpName: result!.currentEpName,
-        source: result!.source,
-        watchedAt: result!.watchedAt,
-      });
-    } catch (error: any) {
-      if (error.name === 'ZodError') {
-        return reply.status(400).send({
-          error: 'Validation Error',
-          details: error.errors,
+        // Since upsert is true, result should never be null
+        return reply.send({
+          id: result!._id,
+          movieId: result!.movieId,
+          movieTitle: result!.movieTitle,
+          moviePoster: result!.moviePoster,
+          originName: result!.originName,
+          episodeCurrent: result!.episodeCurrent,
+          year: result!.year,
+          quality: result!.quality,
+          progress: result!.progress,
+          duration: result!.duration,
+          completed: result!.completed,
+          currentEpSlug: result!.currentEpSlug,
+          currentEpName: result!.currentEpName,
+          source: result!.source,
+          watchedAt: result!.watchedAt,
+        });
+      } catch (error: any) {
+        if (error.name === "ZodError") {
+          return reply.status(400).send({
+            error: "Validation Error",
+            details: error.errors,
+          });
+        }
+        console.error("Update watch history error:", error);
+        return reply.status(500).send({
+          error: "Internal Server Error",
+          message: "Failed to update watch history",
         });
       }
-      console.error('Update watch history error:', error);
-      return reply.status(500).send({
-        error: 'Internal Server Error',
-        message: 'Failed to update watch history',
-      });
-    }
-  });
+    },
+  );
 
-  app.delete('/:movieId', async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const params = watchHistoryParamsSchema.parse(request.params);
-      const { movieId } = params as WatchHistoryParams;
+  app.delete(
+    "/:movieId",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const params = watchHistoryParamsSchema.parse(request.params);
+        const { movieId } = params as WatchHistoryParams;
 
-      const deleted = await watchHistoryService.softDelete(request.user.userId, movieId);
+        const deleted = await watchHistoryService.softDelete(
+          request.user.userId,
+          movieId,
+        );
 
-      if (!deleted) {
-        return reply.status(404).send({
-          error: 'Not Found',
-          message: 'Watch history not found',
+        if (!deleted) {
+          return reply.status(404).send({
+            error: "Not Found",
+            message: "Watch history not found",
+          });
+        }
+
+        return reply.send({ message: "Watch history removed successfully" });
+      } catch (error: any) {
+        if (error.name === "ZodError") {
+          return reply.status(400).send({
+            error: "Validation Error",
+            details: error.errors,
+          });
+        }
+        console.error("Delete watch history error:", error);
+        return reply.status(500).send({
+          error: "Internal Server Error",
+          message: "Failed to delete watch history",
         });
       }
+    },
+  );
 
-      return reply.send({ message: 'Watch history removed successfully' });
-    } catch (error: any) {
-      if (error.name === 'ZodError') {
-        return reply.status(400).send({
-          error: 'Validation Error',
-          details: error.errors,
-        });
-      }
-      console.error('Delete watch history error:', error);
-      return reply.status(500).send({
-        error: 'Internal Server Error',
-        message: 'Failed to delete watch history',
-      });
-    }
-  });
-
-  app.delete('/', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.delete("/", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const deletedCount = await watchHistoryService.softDeleteAll(request.user.userId);
+      const deletedCount = await watchHistoryService.softDeleteAll(
+        request.user.userId,
+      );
 
       return reply.send({
         message: `Removed ${deletedCount} watch history records`,
         deletedCount,
       });
     } catch (error) {
-      console.error('Delete all watch history error:', error);
+      console.error("Delete all watch history error:", error);
       return reply.status(500).send({
-        error: 'Internal Server Error',
-        message: 'Failed to delete watch history',
+        error: "Internal Server Error",
+        message: "Failed to delete watch history",
       });
     }
   });
 
   // Restore endpoint - khôi phục một phim đã xóa
-  app.post('/restore/:movieId', async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const params = watchHistoryParamsSchema.parse(request.params);
-      const { movieId } = params as WatchHistoryParams;
+  app.post(
+    "/restore/:movieId",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const params = watchHistoryParamsSchema.parse(request.params);
+        const { movieId } = params as WatchHistoryParams;
 
-      const result = await watchHistoryService.restore(request.user.userId, movieId);
+        const result = await watchHistoryService.restore(
+          request.user.userId,
+          movieId,
+        );
 
-      if (!result) {
-        return reply.status(404).send({
-          error: 'Not Found',
-          message: 'No deleted watch history found for this movie',
+        if (!result) {
+          return reply.status(404).send({
+            error: "Not Found",
+            message: "No deleted watch history found for this movie",
+          });
+        }
+
+        return reply.status(200).send({
+          id: result._id,
+          movieId: result.movieId,
+          movieTitle: result.movieTitle,
+          moviePoster: result.moviePoster,
+          originName: result.originName,
+          episodeCurrent: result.episodeCurrent,
+          year: result.year,
+          quality: result.quality,
+          progress: result.progress,
+          duration: result.duration,
+          completed: result.completed,
+          currentEpSlug: result.currentEpSlug,
+          currentEpName: result.currentEpName,
+          source: result.source,
+          watchedAt: result.watchedAt,
+          message: "Watch history restored successfully",
+        });
+      } catch (error: any) {
+        if (error.name === "ZodError") {
+          return reply.status(400).send({
+            error: "Validation Error",
+            details: error.errors,
+          });
+        }
+        console.error("Restore watch history error:", error);
+        return reply.status(500).send({
+          error: "Internal Server Error",
+          message: "Failed to restore watch history",
         });
       }
-
-      return reply.status(200).send({
-        id: result._id,
-        movieId: result.movieId,
-        movieTitle: result.movieTitle,
-        moviePoster: result.moviePoster,
-        originName: result.originName,
-        episodeCurrent: result.episodeCurrent,
-        year: result.year,
-        quality: result.quality,
-        progress: result.progress,
-        duration: result.duration,
-        completed: result.completed,
-        currentEpSlug: result.currentEpSlug,
-        currentEpName: result.currentEpName,
-        source: result.source,
-        watchedAt: result.watchedAt,
-        message: 'Watch history restored successfully',
-      });
-    } catch (error: any) {
-      if (error.name === 'ZodError') {
-        return reply.status(400).send({
-          error: 'Validation Error',
-          details: error.errors,
-        });
-      }
-      console.error('Restore watch history error:', error);
-      return reply.status(500).send({
-        error: 'Internal Server Error',
-        message: 'Failed to restore watch history',
-      });
-    }
-  });
+    },
+  );
+  
 }

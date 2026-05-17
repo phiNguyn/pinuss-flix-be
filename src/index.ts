@@ -4,7 +4,7 @@ import cors from "@fastify/cors";
 import { loadEnv } from "./config/env.js";
 import { connectDatabase } from "./config/database.js";
 import { registerJwt, authenticate } from "./services/jwt.service.js";
-import { authRoutes, userRoutes, watchHistoryRoutes, commentRoutes } from "./routes/index.js";
+import { authRoutes, userRoutes, watchHistoryRoutes, commentRoutes, movieViewLogRoutes, adminRoutes, feedbackRoutes } from "./routes/index.js";
 
 const env = loadEnv();
 
@@ -26,15 +26,20 @@ async function build(): Promise<typeof app> {
     origin: JSON.parse(env.FRONTEND_URL || "[]"),
     credentials: true,
   });
-  
+
   await registerJwt(app);
 
   app.decorate("authenticate", authenticate);
+
+  // ========== ROUTES ==========
 
   await app.register(authRoutes, { prefix: "/api/v1/auth" });
   await app.register(userRoutes, { prefix: "/api/v1/users" });
   await app.register(watchHistoryRoutes, { prefix: "/api/v1/watch-history" });
   await app.register(commentRoutes, { prefix: "/api/v1/comments" });
+  await app.register(movieViewLogRoutes, { prefix: "/api/v1/view-logs" });
+  await app.register(adminRoutes, { prefix: "/api/v1/admin" });
+  await app.register(feedbackRoutes, { prefix: "/api/v1/feedback" });
 
   app.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
@@ -49,6 +54,9 @@ async function build(): Promise<typeof app> {
         users: "/api/v1/users",
         watchHistory: "/api/v1/watch-history",
         comments: "/api/v1/comments",
+        viewLogs: "/api/v1/view-logs",
+        admin: "/api/v1/admin",
+        feedback: "/api/v1/feedback",
         health: "/health",
       },
     };
