@@ -1,5 +1,9 @@
-import { MovieViewLog, IMovieViewLog, ViewAction, ViewSource } from "../models/index.js";
-import { Types } from "mongoose";
+import {
+  MovieViewLog,
+  IMovieViewLog,
+  ViewAction,
+  ViewSource,
+} from "../models/index.js";
 import https from "https";
 
 export interface CreateViewLogDto {
@@ -48,17 +52,19 @@ async function fetchMovieFromOphim(movieId: string): Promise<{
   try {
     const data = await new Promise<any>((resolve, reject) => {
       const url = `https://ophim1.com/phim/${movieId}`;
-      https.get(url, (res) => {
-        let body = "";
-        res.on("data", (chunk) => (body += chunk));
-        res.on("end", () => {
-          try {
-            resolve(JSON.parse(body));
-          } catch {
-            reject(new Error("Invalid JSON response"));
-          }
-        });
-      }).on("error", reject);
+      https
+        .get(url, (res) => {
+          let body = "";
+          res.on("data", (chunk) => (body += chunk));
+          res.on("end", () => {
+            try {
+              resolve(JSON.parse(body));
+            } catch {
+              reject(new Error("Invalid JSON response"));
+            }
+          });
+        })
+        .on("error", reject);
     });
 
     if (data?.status && data?.movie) {
@@ -72,7 +78,10 @@ async function fetchMovieFromOphim(movieId: string): Promise<{
       };
 
       // Cache the result
-      movieCache.set(movieId, { data: movieData, expiresAt: Date.now() + CACHE_TTL });
+      movieCache.set(movieId, {
+        data: movieData,
+        expiresAt: Date.now() + CACHE_TTL,
+      });
 
       return movieData;
     }
@@ -105,19 +114,21 @@ export class MovieViewLogService {
   /**
    * Get trending movies based on view logs
    * @param limit - Number of movies to return
-   * @param hoursBack - How many hours back to look (default: 24 hours)
+   * @param hoursBack - How many hours back to look (default: 24 hours, max: 168 = 1 week)
    */
   async getTrendingMovies(
     limit: number = 10,
-    hoursBack: number = 24
+    hoursBack: number = 24,
   ): Promise<TrendingMovieResult[]> {
-    const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
+    // Limit to 1 week max
+    const validHoursBack = Math.min(hoursBack, 168);
+    const since = new Date(Date.now() - validHoursBack * 60 * 60 * 1000);
 
     const trending = await MovieViewLog.aggregate([
       {
         $match: {
           viewedAt: { $gte: since },
-          action: { $in: ["view", "complete"] }, // Chỉ đếm view và complete
+          // action: { $in: ["view", "play", '', "complete"] }, // Chỉ đếm view và complete
         },
       },
       {
@@ -154,7 +165,7 @@ export class MovieViewLogService {
         }
 
         return result;
-      })
+      }),
     );
 
     return enrichedResults;
@@ -189,7 +200,7 @@ export class MovieViewLogService {
         acc[curr._id] = curr.count;
         return acc;
       },
-      {} as Record<string, number>
+      {} as Record<string, number>,
     );
 
     const views24h = await MovieViewLog.countDocuments({
@@ -218,7 +229,7 @@ export class MovieViewLogService {
    */
   async mergeSessionToUser(
     sessionId: string,
-    userId: string
+    userId: string,
   ): Promise<{ mergedCount: number }> {
     if (!sessionId || !userId) {
       return { mergedCount: 0 };
@@ -233,7 +244,7 @@ export class MovieViewLogService {
           userId,
           viewedAt: new Date(), // Update viewedAt to reflect merge time
         },
-      }
+      },
     );
 
     return { mergedCount: result.modifiedCount };
@@ -244,7 +255,7 @@ export class MovieViewLogService {
    */
   async getUserViewHistory(
     userId: string,
-    options: { page?: number; limit?: number } = {}
+    options: { page?: number; limit?: number } = {},
   ): Promise<{
     data: IMovieViewLog[];
     total: number;
@@ -270,7 +281,7 @@ export class MovieViewLogService {
    */
   async getSessionViewHistory(
     sessionId: string,
-    options: { page?: number; limit?: number } = {}
+    options: { page?: number; limit?: number } = {},
   ): Promise<{
     data: IMovieViewLog[];
     total: number;
