@@ -24,6 +24,7 @@ export interface TrendingMovieResult {
   movieId: string;
   movieTitle?: string;
   moviePoster?: string;
+  movieThumb?: string;
   year?: number;
   quality?: string;
   viewCount: number;
@@ -93,6 +94,65 @@ async function fetchMovieFromOphim(movieId: string): Promise<{
   }
 }
 
+async function fetchMovieFromPhimapi(movieId: string): Promise<{
+  name: string;
+  origin_name: string;
+  thumb_url: string;
+  poster_url: string;
+  year: number;
+  quality: string;
+} | null> {
+  // Check cache first
+  const cacheKey = `phimapi:${movieId}`;
+  const cached = movieCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
+
+  try {
+    const data = await new Promise<any>((resolve, reject) => {
+      const url = `https://phimapi.com/phim/${movieId}`;
+      https
+        .get(url, (res) => {
+          let body = "";
+          res.on("data", (chunk) => (body += chunk));
+          res.on("end", () => {
+            try {
+              resolve(JSON.parse(body));
+            } catch {
+              reject(new Error("Invalid JSON response"));
+            }
+          });
+        })
+        .on("error", reject);
+    });
+
+    if (data?.status && data?.movie) {
+      const movieData = {
+        name: data.movie.name,
+        origin_name: data.movie.origin_name,
+        thumb_url: data.movie.thumb_url,
+        poster_url: data.movie.poster_url,
+        year: data.movie.year,
+        quality: data.movie.quality,
+      };
+
+      // Cache the result
+      movieCache.set(cacheKey, {
+        data: movieData,
+        expiresAt: Date.now() + CACHE_TTL,
+      });
+
+      return movieData;
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`Failed to fetch movie ${movieId} from Phimapi:`, error);
+    return null;
+  }
+}
+
 export class MovieViewLogService {
   /**
    * Log a view event (for both anonymous and logged in users)
@@ -143,7 +203,7 @@ export class MovieViewLogService {
       { $limit: limit },
     ]);
 
-    // Enrich with movie details (only for ophim source)
+    // Enrich with movie details based on source
     const enrichedResults: TrendingMovieResult[] = await Promise.all(
       trending.map(async (item) => {
         const result: TrendingMovieResult = {
@@ -153,12 +213,22 @@ export class MovieViewLogService {
           lastViewed: item.lastViewed,
         };
 
-        // Fetch movie details for ophim source
+        // Fetch movie details based on source
         if (item.source === "ophim") {
           const movieData = await fetchMovieFromOphim(item._id as string);
           if (movieData) {
             result.movieTitle = movieData.name;
             result.moviePoster = movieData.thumb_url;
+            result.movieThumb = movieData.poster_url;
+            result.year = movieData.year;
+            result.quality = movieData.quality;
+          }
+        } else if (item.source === "phimapi") {
+          const movieData = await fetchMovieFromPhimapi(item._id as string);
+          if (movieData) {
+            result.movieTitle = movieData.name;
+            result.moviePoster = movieData.poster_url;
+            result.movieThumb = movieData.thumb_url;
             result.year = movieData.year;
             result.quality = movieData.quality;
           }
