@@ -187,7 +187,7 @@ export class MovieViewLogService {
     const trending = await MovieViewLog.aggregate([
       {
         $match: {
-          viewedAt: { $gte: since },
+        //  viewedAt: { $gte: since },
           // action: { $in: ["view", "play", '', "complete"] }, // Chỉ đếm view và complete
         },
       },
