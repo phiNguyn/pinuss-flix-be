@@ -42,3 +42,25 @@ export {
   CreateFeedbackDto,
   FeedbackListResult,
 } from './feedback.service.js';
+
+export {
+  watchSessionService,
+  WatchSessionService,
+  CreateWatchSessionDto,
+  UserWatchStatsSummary,
+} from './watchSession.service.js';
+
+export {
+  leaderboardService,
+  LeaderboardService,
+  LeaderboardPeriod,
+  LeaderboardEntry,
+  LeaderboardResult,
+} from './leaderboard.service.js';
+
+export {
+  watchCalendarService,
+  WatchCalendarService,
+  CalendarMonthResult,
+  CalendarDayResult,
+} from './watchCalendar.service.js';

@@ -9,6 +9,7 @@ export const updateProfileSchema = z.object({
     .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores')
     .optional(),
   avatar: z.string().url().optional().nullable(),
+  bio: z.string().max(200).optional().nullable(),
 });
 
 export const paginationSchema = z.object({

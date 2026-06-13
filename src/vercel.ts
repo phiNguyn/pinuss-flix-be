@@ -17,7 +17,7 @@ async function getApp() {
 
   const { registerJwt, authenticate } =
     await import("./services/jwt.service.js");
-  const { authRoutes, userRoutes, watchHistoryRoutes, commentRoutes, movieViewLogRoutes, adminRoutes, feedbackRoutes } =
+  const { authRoutes, userRoutes, watchHistoryRoutes, commentRoutes, movieViewLogRoutes, adminRoutes, feedbackRoutes, watchSessionRoutes, leaderboardRoutes, watchCalendarRoutes } =
     await import("./routes/index.js");
 
   await registerJwt(app);
@@ -32,6 +32,9 @@ async function getApp() {
   await app.register(movieViewLogRoutes, { prefix: "/api/v1/view-logs" });
   await app.register(adminRoutes, { prefix: "/api/v1/admin" });
   await app.register(feedbackRoutes, { prefix: "/api/v1/feedback" });
+  await app.register(watchSessionRoutes, { prefix: "/api/v1/watch-sessions" });
+  await app.register(leaderboardRoutes, { prefix: "/api/v1/leaderboard" });
+  await app.register(watchCalendarRoutes, { prefix: "/api/v1/watch-calendar" });
 
   app.get("/health", async () => ({
     status: "ok",
