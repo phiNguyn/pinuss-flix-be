@@ -4,7 +4,7 @@ import cors from "@fastify/cors";
 import { loadEnv } from "./config/env.js";
 import { connectDatabase } from "./config/database.js";
 import { registerJwt, authenticate } from "./services/jwt.service.js";
-import { authRoutes, userRoutes, watchHistoryRoutes, commentRoutes, movieViewLogRoutes, adminRoutes, feedbackRoutes } from "./routes/index.js";
+import { authRoutes, userRoutes, watchHistoryRoutes, commentRoutes, movieViewLogRoutes, adminRoutes, feedbackRoutes, watchSessionRoutes, leaderboardRoutes, watchCalendarRoutes } from "./routes/index.js";
 
 const env = loadEnv();
 
@@ -40,6 +40,9 @@ async function build(): Promise<typeof app> {
   await app.register(movieViewLogRoutes, { prefix: "/api/v1/view-logs" });
   await app.register(adminRoutes, { prefix: "/api/v1/admin" });
   await app.register(feedbackRoutes, { prefix: "/api/v1/feedback" });
+  await app.register(watchSessionRoutes, { prefix: "/api/v1/watch-sessions" });
+  await app.register(leaderboardRoutes, { prefix: "/api/v1/leaderboard" });
+  await app.register(watchCalendarRoutes, { prefix: "/api/v1/watch-calendar" });
 
   app.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
@@ -57,6 +60,9 @@ async function build(): Promise<typeof app> {
         viewLogs: "/api/v1/view-logs",
         admin: "/api/v1/admin",
         feedback: "/api/v1/feedback",
+        watchSessions: "/api/v1/watch-sessions",
+        leaderboard: "/api/v1/leaderboard",
+        watchCalendar: "/api/v1/watch-calendar",
         health: "/health",
       },
     };

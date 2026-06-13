@@ -17,6 +17,7 @@ export interface IUser extends Document {
   name?: string;
   username?: string;
   avatar?: string;
+  bio?: string;
   role: UserRole;
   provider: Provider;
   googleId?: string;
@@ -53,6 +54,11 @@ const userSchema = new Schema<IUser>(
     },
     avatar: {
       type: String,
+    },
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: 200,
     },
     role: {
       type: String,

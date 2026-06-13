@@ -28,6 +28,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         name: user.name,
         username: user.username,
         avatar: user.avatar,
+        bio: user.bio,
         role: user.role,
         provider: user.provider,
         createdAt: user.createdAt,
@@ -45,7 +46,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
   app.patch("/me", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body = updateProfileSchema.parse(request.body);
-      const { name, username, avatar } = body as UpdateProfileInput;
+      const { name, username, avatar, bio } = body as UpdateProfileInput;
 
       const user = await authService.findUserById(request.user.userId);
 
@@ -59,6 +60,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       if (name !== undefined) user.name = name;
       if (username !== undefined) user.username = username;
       if (avatar !== undefined) user.avatar = avatar ?? undefined;
+      if (bio !== undefined) user.bio = bio ?? undefined;
 
       await user.save();
 
@@ -68,6 +70,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         name: user.name,
         username: user.username,
         avatar: user.avatar,
+        bio: user.bio,
         role: user.role,
         provider: user.provider,
         createdAt: user.createdAt,

@@ -5,3 +5,6 @@ export { commentRoutes } from './comment.routes.js';
 export { movieViewLogRoutes } from './movieViewLog.routes.js';
 export { adminRoutes } from './admin.routes.js';
 export { feedbackRoutes } from './feedback.routes.js';
+export { watchSessionRoutes } from './watchSession.routes.js';
+export { leaderboardRoutes } from './leaderboard.routes.js';
+export { watchCalendarRoutes } from './watchCalendar.routes.js';
