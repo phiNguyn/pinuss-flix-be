@@ -193,23 +193,24 @@ export class MovieViewLogService {
 
     // Check for metadata match
     if (data.metadata) {
-      query.metadata = {
-        episodeSlug: data.metadata.episodeSlug,
-        episodeName: data.metadata.episodeName,
-        progress: data.metadata.progress,
-        duration: data.metadata.duration,
-      };
+      if (data.metadata?.episodeSlug) {
+        query["metadata.episodeSlug"] = data.metadata.episodeSlug;
+      }
+
+      if (data.metadata?.episodeName) {
+        query["metadata.episodeName"] = data.metadata.episodeName;
+      }
     } else {
       // If no metadata provided, only match logs without metadata
       query.metadata = { $exists: false };
     }
 
     // Check if such a log already exists today
-    const existingLog = await MovieViewLog.findOne(query);
+    const existingLog = await MovieViewLog.findOne(query).sort({ _id: -1 });
 
     if (existingLog) {
       console.log(
-        `[MovieViewLog] Duplicate prevented: ${data.sessionId || data.userId} - Movie: ${data.movieId} - Source: ${data.source}`
+        `[MovieViewLog] Duplicate prevented: ${data.sessionId || data.userId} - Movie: ${data.movieId} - Source: ${data.source}`,
       );
       return existingLog; // Return existing log instead of creating new one
     }
