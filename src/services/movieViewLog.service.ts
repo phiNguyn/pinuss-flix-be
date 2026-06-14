@@ -156,8 +156,65 @@ async function fetchMovieFromPhimapi(movieId: string): Promise<{
 export class MovieViewLogService {
   /**
    * Log a view event (for both anonymous and logged in users)
+   * Prevents duplicate entries based on sessionId, movieId, metadata, and source for today
    */
   async logView(data: CreateViewLogDto): Promise<IMovieViewLog> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(today);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+    // Build query to check for existing log with same sessionId/userId, movieId, source, and metadata
+    const query: any = {
+      movieId: data.movieId,
+      source: data.source ?? "ophim",
+      action: data.action,
+      viewedAt: { $gte: today, $lt: tomorrowStart }, // Same day
+    };
+
+    // Identify user type (sessionId for anonymous, userId for logged in)
+    if (data.userId) {
+      query.userId = data.userId;
+    } else if (data.sessionId) {
+      query.sessionId = data.sessionId;
+    } else {
+      // No sessionId and no userId - skip dedup check, create new entry
+      const log = new MovieViewLog({
+        movieId: data.movieId,
+        action: data.action,
+        source: data.source ?? "ophim",
+        sessionId: data.sessionId,
+        userId: data.userId,
+        metadata: data.metadata,
+        viewedAt: new Date(),
+      });
+      return log.save();
+    }
+
+    // Check for metadata match
+    if (data.metadata) {
+      query.metadata = {
+        episodeSlug: data.metadata.episodeSlug,
+        episodeName: data.metadata.episodeName,
+        progress: data.metadata.progress,
+        duration: data.metadata.duration,
+      };
+    } else {
+      // If no metadata provided, only match logs without metadata
+      query.metadata = { $exists: false };
+    }
+
+    // Check if such a log already exists today
+    const existingLog = await MovieViewLog.findOne(query);
+
+    if (existingLog) {
+      console.log(
+        `[MovieViewLog] Duplicate prevented: ${data.sessionId || data.userId} - Movie: ${data.movieId} - Source: ${data.source}`
+      );
+      return existingLog; // Return existing log instead of creating new one
+    }
+
+    // Create new log if no duplicate found
     const log = new MovieViewLog({
       movieId: data.movieId,
       action: data.action,
