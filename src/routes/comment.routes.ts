@@ -213,7 +213,6 @@ export async function commentRoutes(app: FastifyInstance): Promise<void> {
         }
 
         comment.isDeleted = true;
-        comment.text = "[Bình luận đã bị xóa]";
         await comment.save();
 
         return reply.send({
