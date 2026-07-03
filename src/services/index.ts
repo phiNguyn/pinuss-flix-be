@@ -77,3 +77,11 @@ export {
   CreateNotificationDto,
   NotificationListResult,
 } from "./notification.service.js";
+
+export {
+  streakService,
+  StreakService,
+  StreakProfile,
+  CheckInResult,
+  StreakBadgeDto,
+} from "./streak.service.js";

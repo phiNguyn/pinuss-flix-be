@@ -17,6 +17,7 @@ import {
   watchCalendarRoutes,
   moviesRoutes,
   notificationRoutes,
+  streakRoutes,
 } from "./routes/index.js";
 
 const env = loadEnv();
@@ -58,6 +59,7 @@ async function build(): Promise<typeof app> {
   await app.register(watchCalendarRoutes, { prefix: "/api/v1/watch-calendar" });
   await app.register(moviesRoutes, { prefix: "/api/v1/movies" });
   await app.register(notificationRoutes, { prefix: "/api/v1/notifications" });
+  await app.register(streakRoutes, { prefix: "/api/v1/streak" });
 
   app.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
@@ -80,6 +82,7 @@ async function build(): Promise<typeof app> {
         watchCalendar: "/api/v1/watch-calendar",
         movies: "/api/v1/movies",
         notifications: "/api/v1/notifications",
+        streak: "/api/v1/streak",
         health: "/health",
       },
     };

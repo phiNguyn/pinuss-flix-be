@@ -30,6 +30,7 @@ async function getApp() {
     watchCalendarRoutes,
     moviesRoutes,
     notificationRoutes,
+    streakRoutes,
   } = await import("./routes/index.js");
 
   await registerJwt(app);
@@ -49,6 +50,7 @@ async function getApp() {
   await app.register(watchCalendarRoutes, { prefix: "/api/v1/watch-calendar" });
   await app.register(moviesRoutes, { prefix: "/api/v1/movies" });
   await app.register(notificationRoutes, { prefix: "/api/v1/notifications" });
+  await app.register(streakRoutes, { prefix: "/api/v1/streak" });
 
   app.get("/health", async () => ({
     status: "ok",

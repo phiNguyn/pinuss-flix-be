@@ -10,3 +10,4 @@ export { leaderboardRoutes } from "./leaderboard.routes.js";
 export { watchCalendarRoutes } from "./watchCalendar.routes.js";
 export { moviesRoutes } from "./movies.routes.js";
 export { notificationRoutes } from "./notification.routes.js";
+export { streakRoutes } from "./streak.routes.js";
