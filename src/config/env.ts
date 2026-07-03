@@ -11,6 +11,7 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().default(""),
   GOOGLE_CLIENT_SECRET: z.string().default(""),
   FRONTEND_URL: z.string().default("http://localhost:3000"),
+  CHOPHIM_BASE: z.string().url().default("https://chophim.fun/api"),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
@@ -30,6 +31,7 @@ export function loadEnv(): EnvConfig {
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     FRONTEND_URL: process.env.FRONTEND_URL,
+    CHOPHIM_BASE: process.env.CHOPHIM_BASE,
   });
 
   if (!parsed.success) {

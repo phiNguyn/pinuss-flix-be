@@ -3,7 +3,7 @@ export {
   AuthService,
   TokenPair,
   GoogleUserInfo,
-} from './auth.service.js';
+} from "./auth.service.js";
 
 export {
   registerJwt,
@@ -12,21 +12,21 @@ export {
   verifyRefreshToken,
   authenticate,
   JwtPayload,
-} from './jwt.service.js';
+} from "./jwt.service.js";
 
 export {
   watchHistoryService,
   WatchHistoryService,
   CreateWatchHistoryDto,
   UpdateWatchHistoryDto,
-} from './watchHistory.service.js';
+} from "./watchHistory.service.js";
 
 export {
   movieViewLogService,
   MovieViewLogService,
   CreateViewLogDto,
   TrendingMovieResult,
-} from './movieViewLog.service.js';
+} from "./movieViewLog.service.js";
 
 export {
   adminService,
@@ -34,21 +34,21 @@ export {
   AdminStats,
   UserListResult,
   UserWatchHistoryResult,
-} from './admin.service.js';
+} from "./admin.service.js";
 
 export {
   feedbackService,
   FeedbackService,
   CreateFeedbackDto,
   FeedbackListResult,
-} from './feedback.service.js';
+} from "./feedback.service.js";
 
 export {
   watchSessionService,
   WatchSessionService,
   CreateWatchSessionDto,
   UserWatchStatsSummary,
-} from './watchSession.service.js';
+} from "./watchSession.service.js";
 
 export {
   leaderboardService,
@@ -56,11 +56,17 @@ export {
   LeaderboardPeriod,
   LeaderboardEntry,
   LeaderboardResult,
-} from './leaderboard.service.js';
+} from "./leaderboard.service.js";
 
 export {
   watchCalendarService,
   WatchCalendarService,
   CalendarMonthResult,
   CalendarDayResult,
-} from './watchCalendar.service.js';
+} from "./watchCalendar.service.js";
+
+export {
+  moviesService,
+  MoviesService,
+  ScheduledEpisode,
+} from "./movies.service.js";
