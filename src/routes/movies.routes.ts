@@ -1,8 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import {
-  moviesService,
-  UpstreamFetchError,
-} from "../services/movies.service.js";
+import { moviesService } from "../services/index.js";
 import { scheduledEpisodesQuerySchema } from "./schemas/movies.schema.js";
 
 export async function moviesRoutes(app: FastifyInstance): Promise<void> {
@@ -28,28 +25,10 @@ export async function moviesRoutes(app: FastifyInstance): Promise<void> {
           data,
         });
       } catch (error) {
-        const logContext =
-          error instanceof UpstreamFetchError
-            ? {
-                slug: parsed.data.slug,
-                upstreamUrl: error.url,
-                upstreamStatus: error.status,
-                upstreamBody: error.body,
-                message: error.message,
-              }
-            : {
-                slug: parsed.data.slug,
-                message:
-                  error instanceof Error ? error.message : "Unknown error",
-              };
-
-        // Vercel entry uses Fastify({ logger: false }) — request.log is a no-op.
-        console.error("[scheduled-episodes]", JSON.stringify(logContext));
-
+        request.log.error(error, "Get scheduled episodes error");
         return reply.status(502).send({
           error: "Bad Gateway",
           message: "Failed to fetch scheduled episodes",
-          debug: logContext,
         });
       }
     },

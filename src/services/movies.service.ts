@@ -10,18 +10,6 @@ const scheduledEpisodesResponseSchema = z.array(scheduledEpisodeSchema);
 
 export type ScheduledEpisode = z.infer<typeof scheduledEpisodeSchema>;
 
-export class UpstreamFetchError extends Error {
-  constructor(
-    message: string,
-    readonly url: string,
-    readonly status?: number,
-    readonly body?: string,
-  ) {
-    super(message);
-    this.name = "UpstreamFetchError";
-  }
-}
-
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const UPSTREAM_TIMEOUT = 8000; // 8 seconds
 
@@ -58,38 +46,22 @@ async function fetchJson(url: string): Promise<unknown> {
   try {
     res = await fetch(url, {
       signal: createTimeoutSignal(UPSTREAM_TIMEOUT),
-      headers: {
-        accept: "application/json",
-        "user-agent": "pinuss-flix-be/1.0",
-      },
+      headers: { accept: "application/json" },
     });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Upstream request failed";
-    console.error("[scheduled-episodes] fetch failed:", url, message);
-    throw new UpstreamFetchError(message, url);
+    throw new Error(message);
   }
 
   if (!res.ok) {
-    const body = (await res.text()).slice(0, 200);
-    console.error(
-      "[scheduled-episodes] upstream error:",
-      url,
-      res.status,
-      body,
-    );
-    throw new UpstreamFetchError(
-      `Upstream responded with ${res.status}`,
-      url,
-      res.status,
-      body || undefined,
-    );
+    throw new Error(`Upstream responded with ${res.status}`);
   }
 
   try {
     return await res.json();
   } catch {
-    throw new UpstreamFetchError("Invalid JSON response", url, res.status);
+    throw new Error("Invalid JSON response");
   }
 }
 
