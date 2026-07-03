@@ -1,16 +1,17 @@
-import { Types } from 'mongoose';
-import { WatchSession } from '../models/index.js';
+import { Types } from "mongoose";
+import { WatchSession } from "../models/index.js";
 import {
   formatVietnameseDate,
   secondsToHours,
   DEFAULT_TIMEZONE,
-} from '../utils/date.utils.js';
+} from "../utils/date.utils.js";
 
 export interface CalendarDaySummary {
   date: string;
   totalWatchSeconds: number;
   totalWatchHours: number;
   movieCount: number;
+  posters: string[];
 }
 
 export interface CalendarMonthResult {
@@ -53,7 +54,7 @@ export class WatchCalendarService {
     year: number,
     month: number,
   ): Promise<CalendarMonthResult> {
-    const monthPrefix = `${year}-${String(month).padStart(2, '0')}`;
+    const monthPrefix = `${year}-${String(month).padStart(2, "0")}`;
     const userObjectId = new Types.ObjectId(userId);
 
     const activeDays = await WatchSession.aggregate([
@@ -63,19 +64,42 @@ export class WatchCalendarService {
           watchDate: { $regex: `^${monthPrefix}` },
         },
       },
+      // Gom theo (ngày, phim) để tính thời lượng xem của từng phim trong ngày
       {
         $group: {
-          _id: '$watchDate',
-          totalWatchSeconds: { $sum: '$watchedSeconds' },
-          movieIds: { $addToSet: '$movieId' },
+          _id: { date: "$watchDate", movieId: "$movieId" },
+          moviePoster: { $first: "$moviePoster" },
+          movieWatchSeconds: { $sum: "$watchedSeconds" },
+        },
+      },
+      // Sắp xếp phim xem nhiều nhất trước để lấy poster tiêu biểu
+      { $sort: { "_id.date": 1, movieWatchSeconds: -1 } },
+      {
+        $group: {
+          _id: "$_id.date",
+          totalWatchSeconds: { $sum: "$movieWatchSeconds" },
+          movieCount: { $sum: 1 },
+          posters: { $push: "$moviePoster" },
         },
       },
       {
         $project: {
           _id: 0,
-          date: '$_id',
+          date: "$_id",
           totalWatchSeconds: 1,
-          movieCount: { $size: '$movieIds' },
+          movieCount: 1,
+          posters: {
+            $slice: [
+              {
+                $filter: {
+                  input: "$posters",
+                  as: "p",
+                  cond: { $ne: ["$$p", null] },
+                },
+              },
+              3,
+            ],
+          },
         },
       },
       { $sort: { date: 1 } },
@@ -95,6 +119,7 @@ export class WatchCalendarService {
         totalWatchSeconds: day.totalWatchSeconds,
         totalWatchHours: secondsToHours(day.totalWatchSeconds),
         movieCount: day.movieCount,
+        posters: day.posters ?? [],
       })),
       monthTotalWatchSeconds,
       monthTotalWatchHours: secondsToHours(monthTotalWatchSeconds),
@@ -115,30 +140,30 @@ export class WatchCalendarService {
         {
           $group: {
             _id: {
-              movieId: '$movieId',
-              episodeSlug: '$episodeSlug',
+              movieId: "$movieId",
+              episodeSlug: "$episodeSlug",
             },
-            movieTitle: { $first: '$movieTitle' },
-            moviePoster: { $first: '$moviePoster' },
-            source: { $first: '$source' },
-            episodeName: { $first: '$episodeName' },
-            watchedSeconds: { $sum: '$watchedSeconds' },
+            movieTitle: { $first: "$movieTitle" },
+            moviePoster: { $first: "$moviePoster" },
+            source: { $first: "$source" },
+            episodeName: { $first: "$episodeName" },
+            watchedSeconds: { $sum: "$watchedSeconds" },
             sessions: { $sum: 1 },
           },
         },
         {
           $group: {
-            _id: '$_id.movieId',
-            movieTitle: { $first: '$movieTitle' },
-            moviePoster: { $first: '$moviePoster' },
-            source: { $first: '$source' },
-            totalWatchSeconds: { $sum: '$watchedSeconds' },
+            _id: "$_id.movieId",
+            movieTitle: { $first: "$movieTitle" },
+            moviePoster: { $first: "$moviePoster" },
+            source: { $first: "$source" },
+            totalWatchSeconds: { $sum: "$watchedSeconds" },
             episodes: {
               $push: {
-                episodeSlug: '$_id.episodeSlug',
-                episodeName: '$episodeName',
-                watchedSeconds: '$watchedSeconds',
-                sessions: '$sessions',
+                episodeSlug: "$_id.episodeSlug",
+                episodeName: "$episodeName",
+                watchedSeconds: "$watchedSeconds",
+                sessions: "$sessions",
               },
             },
           },
@@ -147,7 +172,7 @@ export class WatchCalendarService {
         {
           $project: {
             _id: 0,
-            movieId: '$_id',
+            movieId: "$_id",
             movieTitle: 1,
             moviePoster: 1,
             source: 1,
@@ -166,7 +191,7 @@ export class WatchCalendarService {
         {
           $group: {
             _id: null,
-            totalWatchSeconds: { $sum: '$watchedSeconds' },
+            totalWatchSeconds: { $sum: "$watchedSeconds" },
           },
         },
       ]),
