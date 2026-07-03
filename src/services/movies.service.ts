@@ -10,6 +10,18 @@ const scheduledEpisodesResponseSchema = z.array(scheduledEpisodeSchema);
 
 export type ScheduledEpisode = z.infer<typeof scheduledEpisodeSchema>;
 
+export class UpstreamFetchError extends Error {
+  constructor(
+    message: string,
+    readonly url: string,
+    readonly status?: number,
+    readonly body?: string,
+  ) {
+    super(message);
+    this.name = "UpstreamFetchError";
+  }
+}
+
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const UPSTREAM_TIMEOUT = 8000; // 8 seconds
 
@@ -31,19 +43,33 @@ function pruneExpired(now: number): void {
 }
 
 async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetch(url, {
-    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT),
-    headers: { accept: "application/json" },
-  });
+  let res: Response;
+
+  try {
+    res = await fetch(url, {
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT),
+      headers: { accept: "application/json" },
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Upstream request failed";
+    throw new UpstreamFetchError(message, url);
+  }
 
   if (!res.ok) {
-    throw new Error(`Upstream responded with ${res.status}`);
+    const body = (await res.text()).slice(0, 200);
+    throw new UpstreamFetchError(
+      `Upstream responded with ${res.status}`,
+      url,
+      res.status,
+      body || undefined,
+    );
   }
 
   try {
     return await res.json();
   } catch {
-    throw new Error("Invalid JSON response");
+    throw new UpstreamFetchError("Invalid JSON response", url, res.status);
   }
 }
 
@@ -67,9 +93,8 @@ export class MoviesService {
 
   private async loadFromUpstream(slug: string): Promise<ScheduledEpisode[]> {
     const { CHOPHIM_BASE } = loadEnv();
-    const url = `${CHOPHIM_BASE}/scheduled-episodes?slug=${encodeURIComponent(
-      slug,
-    )}`;
+    const base = CHOPHIM_BASE.replace(/\/$/, "");
+    const url = `${base}/scheduled-episodes?slug=${encodeURIComponent(slug)}`;
 
     const raw = await fetchJson(url);
     const parsed = scheduledEpisodesResponseSchema.safeParse(raw);
