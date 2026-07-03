@@ -43,11 +43,13 @@ export async function moviesRoutes(app: FastifyInstance): Promise<void> {
                   error instanceof Error ? error.message : "Unknown error",
               };
 
-        request.log.error(logContext, "Get scheduled episodes error");
+        // Vercel entry uses Fastify({ logger: false }) — request.log is a no-op.
+        console.error("[scheduled-episodes]", JSON.stringify(logContext));
 
         return reply.status(502).send({
           error: "Bad Gateway",
           message: "Failed to fetch scheduled episodes",
+          debug: logContext,
         });
       }
     },

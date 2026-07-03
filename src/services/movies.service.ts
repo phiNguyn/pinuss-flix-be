@@ -42,22 +42,42 @@ function pruneExpired(now: number): void {
   }
 }
 
+function createTimeoutSignal(ms: number): AbortSignal {
+  if (typeof AbortSignal.timeout === "function") {
+    return AbortSignal.timeout(ms);
+  }
+
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
+
 async function fetchJson(url: string): Promise<unknown> {
   let res: Response;
 
   try {
     res = await fetch(url, {
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT),
-      headers: { accept: "application/json" },
+      signal: createTimeoutSignal(UPSTREAM_TIMEOUT),
+      headers: {
+        accept: "application/json",
+        "user-agent": "pinuss-flix-be/1.0",
+      },
     });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Upstream request failed";
+    console.error("[scheduled-episodes] fetch failed:", url, message);
     throw new UpstreamFetchError(message, url);
   }
 
   if (!res.ok) {
     const body = (await res.text()).slice(0, 200);
+    console.error(
+      "[scheduled-episodes] upstream error:",
+      url,
+      res.status,
+      body,
+    );
     throw new UpstreamFetchError(
       `Upstream responded with ${res.status}`,
       url,
