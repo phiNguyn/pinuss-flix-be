@@ -70,3 +70,10 @@ export {
   MoviesService,
   ScheduledEpisode,
 } from "./movies.service.js";
+
+export {
+  notificationService,
+  NotificationService,
+  CreateNotificationDto,
+  NotificationListResult,
+} from "./notification.service.js";

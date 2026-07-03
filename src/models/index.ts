@@ -5,3 +5,9 @@ export { MovieViewLog, IMovieViewLog, ViewAction, ViewSource } from './movieView
 export { Feedback, IFeedback, FeedbackCategory, FeedbackStatus } from './feedback.model.js';
 export { WatchSession, IWatchSession } from './watchSession.model.js';
 export { UserWatchStats, IUserWatchStats } from './userWatchStats.model.js';
+export {
+  Notification,
+  INotification,
+  NotificationType,
+  INotificationMetadata,
+} from './notification.model.js';

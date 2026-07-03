@@ -29,6 +29,7 @@ async function getApp() {
     leaderboardRoutes,
     watchCalendarRoutes,
     moviesRoutes,
+    notificationRoutes,
   } = await import("./routes/index.js");
 
   await registerJwt(app);
@@ -47,6 +48,7 @@ async function getApp() {
   await app.register(leaderboardRoutes, { prefix: "/api/v1/leaderboard" });
   await app.register(watchCalendarRoutes, { prefix: "/api/v1/watch-calendar" });
   await app.register(moviesRoutes, { prefix: "/api/v1/movies" });
+  await app.register(notificationRoutes, { prefix: "/api/v1/notifications" });
 
   app.get("/health", async () => ({
     status: "ok",

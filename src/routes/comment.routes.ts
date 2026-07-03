@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { Comment, User } from "../models/index.js";
+import { Comment, User, IComment } from "../models/index.js";
+import { notificationService } from "../services/index.js";
 import mongoose from "mongoose";
 
 export async function commentRoutes(app: FastifyInstance): Promise<void> {
@@ -17,15 +18,22 @@ export async function commentRoutes(app: FastifyInstance): Promise<void> {
 
         const user = (request as any).user;
 
-        // Validate parentId if provided
+        let parentComment: IComment | null = null;
+        // rootId = top-level comment of the thread. Null for root comments.
+        // A reply to a root -> rootId = root._id.
+        // A reply to a reply -> rootId = parent.rootId (same top-level thread).
+        let rootId: mongoose.Types.ObjectId | null = null;
         if (parentId) {
-          const parentComment = await Comment.findById(parentId);
+          parentComment = await Comment.findById(parentId);
           if (!parentComment) {
             return reply.status(404).send({
               error: "Not Found",
               message: "Parent comment not found",
             });
           }
+          rootId =
+            (parentComment.rootId as mongoose.Types.ObjectId | null) ??
+            parentComment._id;
         }
 
         // Fetch user from DB to get accurate name
@@ -39,13 +47,30 @@ export async function commentRoutes(app: FastifyInstance): Promise<void> {
           userName,
           userAvatar,
           text,
-          parentId: parentId
-            ? new mongoose.Types.ObjectId(parentId)
-            : null,
+          parentId: parentId ? new mongoose.Types.ObjectId(parentId) : null,
+          rootId,
+          replyToUserName: parentComment?.userName ?? null,
           likes: 0,
         });
 
         await comment.save();
+
+        if (parentComment) {
+          notificationService
+            .notifyCommentReply({
+              recipientUserId: parentComment.userId.toString(),
+              actorUserId: user.userId,
+              actorName: userName,
+              actorAvatar: userAvatar,
+              movieSlug,
+              commentId: comment._id.toString(),
+              parentCommentId: parentId!,
+              replyPreview: text,
+            })
+            .catch((err) =>
+              console.error("Failed to send comment reply notification:", err),
+            );
+        }
 
         return reply.status(201).send({
           success: true,
@@ -73,10 +98,16 @@ export async function commentRoutes(app: FastifyInstance): Promise<void> {
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { movieSlug } = request.params as { movieSlug: string };
-        const { page = "1", limit = "20", parentId } = request.query as {
+        const {
+          page = "1",
+          limit = "20",
+          parentId,
+          rootId,
+        } = request.query as {
           page?: string;
           limit?: string;
           parentId?: string;
+          rootId?: string;
         };
 
         const pageNum = parseInt(page, 10) || 1;
@@ -85,8 +116,14 @@ export async function commentRoutes(app: FastifyInstance): Promise<void> {
 
         const query: any = { movieSlug, isDeleted: false };
 
-        // Filter by parentId
-        if (parentId === "null" || parentId === "") {
+        // rootId takes precedence: fetch the whole flattened thread (all replies
+        // of a top-level comment, including reply-to-reply), oldest first.
+        // Otherwise filter by parentId (parentId=null => root comments).
+        let sortOrder: 1 | -1 = -1;
+        if (rootId) {
+          query.rootId = new mongoose.Types.ObjectId(rootId);
+          sortOrder = 1;
+        } else if (parentId === "null" || parentId === "") {
           query.parentId = null;
         } else if (parentId) {
           query.parentId = new mongoose.Types.ObjectId(parentId);
@@ -94,18 +131,19 @@ export async function commentRoutes(app: FastifyInstance): Promise<void> {
 
         const [comments, total] = await Promise.all([
           Comment.find(query)
-            .sort({ createdAt: -1 })
+            .sort({ createdAt: sortOrder })
             .skip(skip)
             .limit(limitNum)
             .lean(),
           Comment.countDocuments(query),
         ]);
 
-        // Get reply counts for each comment
+        // Reply count = size of the whole flattened thread (grouped by rootId),
+        // so a root comment reflects replies AND reply-to-reply.
         const commentIds = comments.map((c) => c._id);
         const replyCounts = await Comment.aggregate([
-          { $match: { parentId: { $in: commentIds }, isDeleted: false } },
-          { $group: { _id: "$parentId", count: { $sum: 1 } } },
+          { $match: { rootId: { $in: commentIds }, isDeleted: false } },
+          { $group: { _id: "$rootId", count: { $sum: 1 } } },
         ]);
 
         const replyCountMap = new Map(

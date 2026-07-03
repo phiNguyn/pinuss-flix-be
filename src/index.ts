@@ -16,6 +16,7 @@ import {
   leaderboardRoutes,
   watchCalendarRoutes,
   moviesRoutes,
+  notificationRoutes,
 } from "./routes/index.js";
 
 const env = loadEnv();
@@ -56,6 +57,7 @@ async function build(): Promise<typeof app> {
   await app.register(leaderboardRoutes, { prefix: "/api/v1/leaderboard" });
   await app.register(watchCalendarRoutes, { prefix: "/api/v1/watch-calendar" });
   await app.register(moviesRoutes, { prefix: "/api/v1/movies" });
+  await app.register(notificationRoutes, { prefix: "/api/v1/notifications" });
 
   app.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
@@ -77,6 +79,7 @@ async function build(): Promise<typeof app> {
         leaderboard: "/api/v1/leaderboard",
         watchCalendar: "/api/v1/watch-calendar",
         movies: "/api/v1/movies",
+        notifications: "/api/v1/notifications",
         health: "/health",
       },
     };

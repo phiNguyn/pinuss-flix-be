@@ -9,6 +9,8 @@ export interface IComment extends Document {
   text: string;
   likes: number;
   parentId?: Types.ObjectId | null;
+  rootId?: Types.ObjectId | null;
+  replyToUserName?: string | null;
   isDeleted: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -50,6 +52,19 @@ const commentSchema = new Schema<IComment>(
       default: null,
       index: true,
     },
+    // Top-level comment of the whole thread. Null for root comments.
+    // Every reply (including reply-to-reply) is flattened under the same rootId.
+    rootId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Comment',
+      default: null,
+      index: true,
+    },
+    // Denormalized name of the user being directly replied to (for "@name" display).
+    replyToUserName: {
+      type: String,
+      default: null,
+    },
     isDeleted: {
       type: Boolean,
       default: false,
@@ -63,5 +78,6 @@ const commentSchema = new Schema<IComment>(
 // Compound index for efficient queries
 commentSchema.index({ movieSlug: 1, createdAt: -1 });
 commentSchema.index({ parentId: 1, createdAt: 1 });
+commentSchema.index({ rootId: 1, createdAt: 1 });
 
 export const Comment = mongoose.model<IComment>('Comment', commentSchema);

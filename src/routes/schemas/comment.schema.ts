@@ -1,9 +1,12 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const createCommentSchema = z.object({
   body: z.object({
-    movieSlug: z.string().min(1, 'Movie slug is required'),
-    text: z.string().min(1, 'Comment text is required').max(2000, 'Comment too long'),
+    movieSlug: z.string().min(1, "Movie slug is required"),
+    text: z
+      .string()
+      .min(1, "Comment text is required")
+      .max(2000, "Comment too long"),
     parentId: z.string().optional().nullable(),
   }),
 });
@@ -13,9 +16,16 @@ export const getCommentsSchema = z.object({
     movieSlug: z.string().min(1),
   }),
   query: z.object({
-    page: z.string().optional().transform((val) => parseInt(val || '1', 10)),
-    limit: z.string().optional().transform((val) => parseInt(val || '20', 10)),
+    page: z
+      .string()
+      .optional()
+      .transform((val) => parseInt(val || "1", 10)),
+    limit: z
+      .string()
+      .optional()
+      .transform((val) => parseInt(val || "20", 10)),
     parentId: z.string().optional().nullable(),
+    rootId: z.string().optional().nullable(),
   }),
 });
 
