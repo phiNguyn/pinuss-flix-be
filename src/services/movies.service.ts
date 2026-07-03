@@ -1,74 +1,83 @@
-import https from "https";
+import { z } from "zod";
+import { loadEnv } from "../config/env.js";
 
-export interface ScheduledEpisode {
-  episode: string;
-  air_date: string;
-}
+const scheduledEpisodeSchema = z.object({
+  episode: z.string(),
+  air_date: z.string(),
+});
 
-const CHOPHIM_BASE = "https://chophim.fun/api";
+const scheduledEpisodesResponseSchema = z.array(scheduledEpisodeSchema);
 
-// Simple in-memory cache to avoid hammering the upstream API
+export type ScheduledEpisode = z.infer<typeof scheduledEpisodeSchema>;
+
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const UPSTREAM_TIMEOUT = 8000; // 8 seconds
+
+// Simple in-memory cache to avoid hammering the upstream API.
 const scheduleCache = new Map<
   string,
   { data: ScheduledEpisode[]; expiresAt: number }
 >();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-function fetchJson<T>(url: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    https
-      .get(url, (res) => {
-        if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
-          res.resume();
-          reject(new Error(`Upstream responded with ${res.statusCode}`));
-          return;
-        }
+// Dedup concurrent requests for the same slug to avoid a cache stampede.
+const inFlight = new Map<string, Promise<ScheduledEpisode[]>>();
 
-        let body = "";
-        res.on("data", (chunk) => (body += chunk));
-        res.on("end", () => {
-          try {
-            resolve(JSON.parse(body) as T);
-          } catch {
-            reject(new Error("Invalid JSON response"));
-          }
-        });
-      })
-      .on("error", reject);
+function pruneExpired(now: number): void {
+  for (const [key, entry] of scheduleCache) {
+    if (entry.expiresAt <= now) {
+      scheduleCache.delete(key);
+    }
+  }
+}
+
+async function fetchJson(url: string): Promise<unknown> {
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT),
+    headers: { accept: "application/json" },
   });
+
+  if (!res.ok) {
+    throw new Error(`Upstream responded with ${res.status}`);
+  }
+
+  try {
+    return await res.json();
+  } catch {
+    throw new Error("Invalid JSON response");
+  }
 }
 
 export class MoviesService {
   async getScheduledEpisodes(slug: string): Promise<ScheduledEpisode[]> {
+    const now = Date.now();
     const cached = scheduleCache.get(slug);
-    if (cached && cached.expiresAt > Date.now()) {
+    if (cached && cached.expiresAt > now) {
       return cached.data;
     }
 
+    const existing = inFlight.get(slug);
+    if (existing) return existing;
+
+    const request = this.loadFromUpstream(slug).finally(() => {
+      inFlight.delete(slug);
+    });
+    inFlight.set(slug, request);
+    return request;
+  }
+
+  private async loadFromUpstream(slug: string): Promise<ScheduledEpisode[]> {
+    const { CHOPHIM_BASE } = loadEnv();
     const url = `${CHOPHIM_BASE}/scheduled-episodes?slug=${encodeURIComponent(
       slug,
     )}`;
 
-    const raw = await fetchJson<unknown>(url);
+    const raw = await fetchJson(url);
+    const parsed = scheduledEpisodesResponseSchema.safeParse(raw);
+    const data = parsed.success ? parsed.data : [];
 
-    const data: ScheduledEpisode[] = Array.isArray(raw)
-      ? raw
-          .filter(
-            (item): item is ScheduledEpisode =>
-              !!item &&
-              typeof (item as ScheduledEpisode).episode === "string" &&
-              typeof (item as ScheduledEpisode).air_date === "string",
-          )
-          .map((item) => ({
-            episode: item.episode,
-            air_date: item.air_date,
-          }))
-      : [];
-
-    scheduleCache.set(slug, {
-      data,
-      expiresAt: Date.now() + CACHE_TTL,
-    });
+    const now = Date.now();
+    pruneExpired(now);
+    scheduleCache.set(slug, { data, expiresAt: now + CACHE_TTL });
 
     return data;
   }

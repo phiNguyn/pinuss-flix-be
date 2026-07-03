@@ -1,9 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { moviesService } from "../services/index.js";
-import {
-  scheduledEpisodesQuerySchema,
-  ScheduledEpisodesQueryInput,
-} from "./schemas/movies.schema.js";
+import { scheduledEpisodesQuerySchema } from "./schemas/movies.schema.js";
 
 export async function moviesRoutes(app: FastifyInstance): Promise<void> {
   // ========== PUBLIC ENDPOINTS ==========
@@ -12,26 +9,23 @@ export async function moviesRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     "/scheduled-episodes",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      try {
-        const { slug } = scheduledEpisodesQuerySchema.parse(
-          request.query,
-        ) as ScheduledEpisodesQueryInput;
+      const parsed = scheduledEpisodesQuerySchema.safeParse(request.query);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: "Validation Error",
+          details: parsed.error.issues,
+        });
+      }
 
-        const data = await moviesService.getScheduledEpisodes(slug);
+      try {
+        const data = await moviesService.getScheduledEpisodes(parsed.data.slug);
 
         return reply.send({
           success: true,
           data,
         });
-      } catch (error: any) {
-        if (error.name === "ZodError") {
-          return reply.status(400).send({
-            error: "Validation Error",
-            details: error.errors,
-          });
-        }
-
-        console.error("Get scheduled episodes error:", error);
+      } catch (error) {
+        request.log.error(error, "Get scheduled episodes error");
         return reply.status(502).send({
           error: "Bad Gateway",
           message: "Failed to fetch scheduled episodes",
