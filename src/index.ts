@@ -4,7 +4,19 @@ import cors from "@fastify/cors";
 import { loadEnv } from "./config/env.js";
 import { connectDatabase } from "./config/database.js";
 import { registerJwt, authenticate } from "./services/jwt.service.js";
-import { authRoutes, userRoutes, watchHistoryRoutes, commentRoutes, movieViewLogRoutes, adminRoutes, feedbackRoutes, watchSessionRoutes, leaderboardRoutes, watchCalendarRoutes } from "./routes/index.js";
+import {
+  authRoutes,
+  userRoutes,
+  watchHistoryRoutes,
+  commentRoutes,
+  movieViewLogRoutes,
+  adminRoutes,
+  feedbackRoutes,
+  watchSessionRoutes,
+  leaderboardRoutes,
+  watchCalendarRoutes,
+  moviesRoutes,
+} from "./routes/index.js";
 
 const env = loadEnv();
 
@@ -43,6 +55,7 @@ async function build(): Promise<typeof app> {
   await app.register(watchSessionRoutes, { prefix: "/api/v1/watch-sessions" });
   await app.register(leaderboardRoutes, { prefix: "/api/v1/leaderboard" });
   await app.register(watchCalendarRoutes, { prefix: "/api/v1/watch-calendar" });
+  await app.register(moviesRoutes, { prefix: "/api/v1/movies" });
 
   app.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
@@ -63,6 +76,7 @@ async function build(): Promise<typeof app> {
         watchSessions: "/api/v1/watch-sessions",
         leaderboard: "/api/v1/leaderboard",
         watchCalendar: "/api/v1/watch-calendar",
+        movies: "/api/v1/movies",
         health: "/health",
       },
     };
