@@ -1,13 +1,13 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document } from "mongoose";
 
 export enum Provider {
-  LOCAL = 'local',
-  GOOGLE = 'google',
+  LOCAL = "local",
+  GOOGLE = "google",
 }
 
 export enum UserRole {
-  USER = 'user',
-  ADMIN = 'admin',
+  USER = "user",
+  ADMIN = "admin",
 }
 
 export interface IUser extends Document {
@@ -82,11 +82,10 @@ const userSchema = new Schema<IUser>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Index for role-based queries
 userSchema.index({ role: 1 });
-userSchema.index({ email: 1 });
 
-export const User = mongoose.model<IUser>('User', userSchema);
+export const User = mongoose.model<IUser>("User", userSchema);
