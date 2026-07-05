@@ -32,18 +32,22 @@ export interface TrendingMovieResult {
   lastViewed: Date;
 }
 
-// Cache for movie details (simple in-memory cache)
-const movieCache = new Map<string, { data: any; expiresAt: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-async function fetchMovieFromOphim(movieId: string): Promise<{
+type MovieDetails = {
   name: string;
   origin_name: string;
   thumb_url: string;
   poster_url: string;
   year: number;
   quality: string;
-} | null> {
+};
+
+// Cache for movie details (simple in-memory cache)
+const movieCache = new Map<string, { data: any; expiresAt: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function fetchMovieFromOphim(
+  movieId: string,
+): Promise<MovieDetails | null> {
   // Check cache first
   const cached = movieCache.get(movieId);
   if (cached && cached.expiresAt > Date.now()) {
@@ -94,14 +98,9 @@ async function fetchMovieFromOphim(movieId: string): Promise<{
   }
 }
 
-async function fetchMovieFromPhimapi(movieId: string): Promise<{
-  name: string;
-  origin_name: string;
-  thumb_url: string;
-  poster_url: string;
-  year: number;
-  quality: string;
-} | null> {
+async function fetchMovieFromPhimapi(
+  movieId: string,
+): Promise<MovieDetails | null> {
   // Check cache first
   const cacheKey = `phimapi:${movieId}`;
   const cached = movieCache.get(cacheKey);
@@ -151,6 +150,52 @@ async function fetchMovieFromPhimapi(movieId: string): Promise<{
     console.error(`Failed to fetch movie ${movieId} from Phimapi:`, error);
     return null;
   }
+}
+
+function applyTrendingMovieDetails(
+  result: TrendingMovieResult,
+  movieData: MovieDetails,
+  dataSource: ViewSource,
+) {
+  result.movieTitle = movieData.name;
+  result.year = movieData.year;
+  result.quality = movieData.quality;
+
+  if (dataSource === "ophim") {
+    result.moviePoster = movieData.thumb_url;
+    result.movieThumb = movieData.poster_url;
+  } else {
+    result.moviePoster = movieData.poster_url;
+    result.movieThumb = movieData.thumb_url;
+  }
+}
+
+async function fetchMovieWithFallback(
+  movieId: string,
+  source: ViewSource,
+): Promise<{ data: MovieDetails | null; dataSource: ViewSource }> {
+  const fetchers: Record<ViewSource, () => Promise<MovieDetails | null>> = {
+    ophim: () => fetchMovieFromOphim(movieId),
+    phimapi: () => fetchMovieFromPhimapi(movieId),
+    nguonc: () => fetchMovieFromOphim(movieId),
+  };
+
+  const fallbackOrder: ViewSource[] =
+    source === "phimapi" ? ["phimapi", "ophim"] : ["ophim", "phimapi"];
+
+  for (const trySource of fallbackOrder) {
+    const data = await fetchers[trySource]();
+    if (data) {
+      if (trySource !== source) {
+        console.warn(
+          `[Trending] Fallback ${source} → ${trySource} for movie ${movieId}`,
+        );
+      }
+      return { data, dataSource: trySource };
+    }
+  }
+
+  return { data: null, dataSource: source };
 }
 
 export class MovieViewLogService {
@@ -271,24 +316,20 @@ export class MovieViewLogService {
           lastViewed: item.lastViewed,
         };
 
-        // Fetch movie details based on source
-        if (item.source === "ophim") {
-          const movieData = await fetchMovieFromOphim(item._id as string);
-          if (movieData) {
-            result.movieTitle = movieData.name;
-            result.moviePoster = movieData.thumb_url;
-            result.movieThumb = movieData.poster_url;
-            result.year = movieData.year;
-            result.quality = movieData.quality;
-          }
-        } else if (item.source === "phimapi") {
-          const movieData = await fetchMovieFromPhimapi(item._id as string);
-          if (movieData) {
-            result.movieTitle = movieData.name;
-            result.moviePoster = movieData.poster_url;
-            result.movieThumb = movieData.thumb_url;
-            result.year = movieData.year;
-            result.quality = movieData.quality;
+        const fetchSource: ViewSource =
+          item.source === "phimapi" ? "phimapi" : "ophim";
+
+        if (
+          item.source === "ophim" ||
+          item.source === "phimapi" ||
+          item.source === "nguonc"
+        ) {
+          const { data, dataSource } = await fetchMovieWithFallback(
+            item._id as string,
+            fetchSource,
+          );
+          if (data) {
+            applyTrendingMovieDetails(result, data, dataSource);
           }
         }
 
