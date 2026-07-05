@@ -23,10 +23,14 @@ export interface CreateViewLogDto {
 export interface TrendingMovieResult {
   movieId: string;
   movieTitle?: string;
+  originalName?: string;
   moviePoster?: string;
   movieThumb?: string;
   year?: number;
   quality?: string;
+  episodeCurrent?: string;
+  episodeTotal?: string;
+  status?: string;
   viewCount: number;
   source: ViewSource;
   lastViewed: Date;
@@ -39,6 +43,9 @@ type MovieDetails = {
   poster_url: string;
   year: number;
   quality: string;
+  episode_current?: string;
+  episode_total?: string;
+  status?: string;
 };
 
 // Cache for movie details (simple in-memory cache)
@@ -80,6 +87,9 @@ async function fetchMovieFromOphim(
         poster_url: data.movie.poster_url,
         year: data.movie.year,
         quality: data.movie.quality,
+        episode_current: data.movie.episode_current,
+        episode_total: data.movie.episode_total,
+        status: data.movie.status,
       };
 
       // Cache the result
@@ -134,6 +144,9 @@ async function fetchMovieFromPhimapi(
         poster_url: data.movie.poster_url,
         year: data.movie.year,
         quality: data.movie.quality,
+        episode_current: data.movie.episode_current,
+        episode_total: data.movie.episode_total,
+        status: data.movie.status,
       };
 
       // Cache the result
@@ -157,9 +170,14 @@ function applyTrendingMovieDetails(
   movieData: MovieDetails,
   dataSource: ViewSource,
 ) {
+  result.source = dataSource;
   result.movieTitle = movieData.name;
+  result.originalName = movieData.origin_name;
   result.year = movieData.year;
   result.quality = movieData.quality;
+  result.episodeCurrent = movieData.episode_current;
+  result.episodeTotal = movieData.episode_total;
+  result.status = movieData.status;
 
   if (dataSource === "ophim") {
     result.moviePoster = movieData.thumb_url;
@@ -344,6 +362,7 @@ export class MovieViewLogService {
    * Get movie statistics
    */
   async getMovieStats(movieId: string): Promise<{
+    viewCount: number;
     totalViews: number;
     views24h: number;
     views7d: number;
@@ -354,17 +373,30 @@ export class MovieViewLogService {
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const [stats] = await MovieViewLog.aggregate([
-      { $match: { movieId } },
-      {
-        $group: {
-          _id: "$action",
-          count: { $sum: 1 },
+    const [viewCount, statsAgg, views24h, views7d] = await Promise.all([
+      MovieViewLog.countDocuments({ movieId }),
+      MovieViewLog.aggregate([
+        { $match: { movieId } },
+        {
+          $group: {
+            _id: "$action",
+            count: { $sum: 1 },
+          },
         },
-      },
+      ]),
+      MovieViewLog.countDocuments({
+        movieId,
+        action: { $in: ["view", "complete"] },
+        viewedAt: { $gte: last24h },
+      }),
+      MovieViewLog.countDocuments({
+        movieId,
+        action: { $in: ["view", "complete"] },
+        viewedAt: { $gte: last7d },
+      }),
     ]);
 
-    const statsMap = stats.reduce(
+    const statsMap = statsAgg.reduce(
       (acc: Record<string, number>, curr: { _id: string; count: number }) => {
         acc[curr._id] = curr.count;
         return acc;
@@ -372,19 +404,8 @@ export class MovieViewLogService {
       {} as Record<string, number>,
     );
 
-    const views24h = await MovieViewLog.countDocuments({
-      movieId,
-      action: { $in: ["view", "complete"] },
-      viewedAt: { $gte: last24h },
-    });
-
-    const views7d = await MovieViewLog.countDocuments({
-      movieId,
-      action: { $in: ["view", "complete"] },
-      viewedAt: { $gte: last7d },
-    });
-
     return {
+      viewCount,
       totalViews: (statsMap["view"] || 0) + (statsMap["complete"] || 0),
       views24h,
       views7d,
