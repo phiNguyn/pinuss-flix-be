@@ -1,7 +1,15 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { adminService } from "../services/index.js";
+import {
+  adminService,
+  streakService,
+  watchCalendarService,
+} from "../services/index.js";
 import { UserRole } from "../models/index.js";
 import { z } from "zod";
+import {
+  calendarMonthQuerySchema,
+  calendarDateParamsSchema,
+} from "./schemas/watchCalendar.schema.js";
 
 // Validation schemas
 const paginationSchema = z.object({
@@ -20,10 +28,15 @@ const updateRoleSchema = z.object({
   role: z.enum(["user", "admin"]),
 });
 
+const monthQuerySchema = z.object({
+  year: z.coerce.number().min(2020).max(2100),
+  month: z.coerce.number().min(1).max(12),
+});
+
 // Middleware to verify admin role
 async function adminGuard(
   request: FastifyRequest,
-  reply: FastifyReply
+  reply: FastifyReply,
 ): Promise<void> {
   try {
     const authHeader = request.headers.authorization;
@@ -37,7 +50,7 @@ async function adminGuard(
 
     // Get user ID from JWT
     const decoded = await (request.server as any).jwt.verify(
-      authHeader.replace("Bearer ", "")
+      authHeader.replace("Bearer ", ""),
     );
 
     if (!decoded?.userId) {
@@ -77,64 +90,58 @@ export async function adminRoutes(app: FastifyInstance) {
   /**
    * GET /api/v1/admin/stats - Get admin dashboard statistics
    */
-  app.get(
-    "/stats",
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      try {
-        const stats = await adminService.getStats();
+  app.get("/stats", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const stats = await adminService.getStats();
 
-        return reply.send({
-          success: true,
-          data: stats,
-        });
-      } catch (error) {
-        console.error("Get admin stats error:", error);
-        return reply.status(500).send({
-          error: "Internal Server Error",
-          message: "Không thể lấy thống kê",
-        });
-      }
+      return reply.send({
+        success: true,
+        data: stats,
+      });
+    } catch (error) {
+      console.error("Get admin stats error:", error);
+      return reply.status(500).send({
+        error: "Internal Server Error",
+        message: "Không thể lấy thống kê",
+      });
     }
-  );
+  });
 
   // ========== USERS ==========
 
   /**
    * GET /api/v1/admin/users - Get paginated user list
    */
-  app.get(
-    "/users",
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      try {
-        const query = userListQuerySchema.parse(request.query);
+  app.get("/users", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const query = userListQuerySchema.parse(request.query);
 
-        const result = await adminService.getUsers(query as any);
+      const result = await adminService.getUsers(query as any);
 
-        return reply.send({
-          success: true,
-          data: result.users,
-          pagination: {
-            page: result.page,
-            limit: result.limit,
-            total: result.total,
-            totalPages: Math.ceil(result.total / result.limit),
-          },
-        });
-      } catch (error: any) {
-        if (error.name === "ZodError") {
-          return reply.status(400).send({
-            error: "Validation Error",
-            details: error.errors,
-          });
-        }
-        console.error("Get users error:", error);
-        return reply.status(500).send({
-          error: "Internal Server Error",
-          message: "Không thể lấy danh sách người dùng",
+      return reply.send({
+        success: true,
+        data: result.users,
+        pagination: {
+          page: result.page,
+          limit: result.limit,
+          total: result.total,
+          totalPages: Math.ceil(result.total / result.limit),
+        },
+      });
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return reply.status(400).send({
+          error: "Validation Error",
+          details: error.errors,
         });
       }
+      console.error("Get users error:", error);
+      return reply.status(500).send({
+        error: "Internal Server Error",
+        message: "Không thể lấy danh sách người dùng",
+      });
     }
-  );
+  });
 
   /**
    * GET /api/v1/admin/users/:userId - Get user detail
@@ -165,7 +172,7 @@ export async function adminRoutes(app: FastifyInstance) {
           message: "Không thể lấy thông tin người dùng",
         });
       }
-    }
+    },
   );
 
   /**
@@ -203,7 +210,171 @@ export async function adminRoutes(app: FastifyInstance) {
           message: "Không thể lấy lịch sử xem",
         });
       }
-    }
+    },
+  );
+
+  /**
+   * GET /api/v1/admin/users/:userId/streak - Get user's streak profile
+   */
+  app.get(
+    "/users/:userId/streak",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { userId } = request.params as { userId: string };
+
+        const user = await adminService.getUserDetail(userId);
+        if (!user) {
+          return reply.status(404).send({
+            error: "Not Found",
+            message: "Người dùng không tồn tại",
+          });
+        }
+
+        const profile = await streakService.getProfile(userId);
+
+        return reply.send({
+          success: true,
+          data: profile,
+        });
+      } catch (error) {
+        console.error("Get user streak error:", error);
+        return reply.status(500).send({
+          error: "Internal Server Error",
+          message: "Không thể lấy thông tin chuỗi",
+        });
+      }
+    },
+  );
+
+  /**
+   * GET /api/v1/admin/users/:userId/streak/calendar - Get user's streak calendar for a month
+   */
+  app.get(
+    "/users/:userId/streak/calendar",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { userId } = request.params as { userId: string };
+        const query = monthQuerySchema.parse(request.query);
+
+        const user = await adminService.getUserDetail(userId);
+        if (!user) {
+          return reply.status(404).send({
+            error: "Not Found",
+            message: "Người dùng không tồn tại",
+          });
+        }
+
+        const dates = await streakService.getMonthCheckIns(
+          userId,
+          query.year,
+          query.month,
+        );
+
+        return reply.send({
+          success: true,
+          data: { year: query.year, month: query.month, dates },
+        });
+      } catch (error: any) {
+        if (error.name === "ZodError") {
+          return reply.status(400).send({
+            error: "Validation Error",
+            details: error.errors,
+          });
+        }
+        console.error("Get user streak calendar error:", error);
+        return reply.status(500).send({
+          error: "Internal Server Error",
+          message: "Không thể lấy lịch điểm danh",
+        });
+      }
+    },
+  );
+
+  /**
+   * GET /api/v1/admin/users/:userId/watch-calendar - Get user's watch calendar month overview
+   */
+  app.get(
+    "/users/:userId/watch-calendar",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { userId } = request.params as { userId: string };
+        const query = calendarMonthQuerySchema.parse(request.query);
+
+        const user = await adminService.getUserDetail(userId);
+        if (!user) {
+          return reply.status(404).send({
+            error: "Not Found",
+            message: "Người dùng không tồn tại",
+          });
+        }
+
+        const result = await watchCalendarService.getMonthOverview(
+          userId,
+          query.year,
+          query.month,
+        );
+
+        return reply.send({
+          success: true,
+          data: result,
+        });
+      } catch (error: any) {
+        if (error.name === "ZodError") {
+          return reply.status(400).send({
+            error: "Validation Error",
+            details: error.errors,
+          });
+        }
+        console.error("Get user watch calendar error:", error);
+        return reply.status(500).send({
+          error: "Internal Server Error",
+          message: "Không thể lấy lịch xem phim",
+        });
+      }
+    },
+  );
+
+  /**
+   * GET /api/v1/admin/users/:userId/watch-calendar/:date - Get user's watch calendar day detail
+   */
+  app.get(
+    "/users/:userId/watch-calendar/:date",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { userId } = request.params as { userId: string };
+        const params = calendarDateParamsSchema.parse(request.params);
+
+        const user = await adminService.getUserDetail(userId);
+        if (!user) {
+          return reply.status(404).send({
+            error: "Not Found",
+            message: "Người dùng không tồn tại",
+          });
+        }
+
+        const result = await watchCalendarService.getDayDetail(
+          userId,
+          params.date,
+        );
+
+        return reply.send({
+          success: true,
+          data: result,
+        });
+      } catch (error: any) {
+        if (error.name === "ZodError") {
+          return reply.status(400).send({
+            error: "Validation Error",
+            details: error.errors,
+          });
+        }
+        console.error("Get user watch calendar day error:", error);
+        return reply.status(500).send({
+          error: "Internal Server Error",
+          message: "Không thể lấy chi tiết ngày xem phim",
+        });
+      }
+    },
   );
 
   /**
@@ -228,7 +399,7 @@ export async function adminRoutes(app: FastifyInstance) {
         const result = await adminService.updateUserRole(
           userId,
           body.role as UserRole,
-          adminId
+          adminId,
         );
 
         if (!result.success) {
@@ -255,7 +426,7 @@ export async function adminRoutes(app: FastifyInstance) {
           message: "Không thể cập nhật vai trò",
         });
       }
-    }
+    },
   );
 
   /**
@@ -290,7 +461,7 @@ export async function adminRoutes(app: FastifyInstance) {
           message: "Không thể thay đổi trạng thái tài khoản",
         });
       }
-    }
+    },
   );
 
   // ========== COMMENTS ==========
@@ -298,42 +469,41 @@ export async function adminRoutes(app: FastifyInstance) {
   /**
    * GET /api/v1/admin/comments - Get all comments
    */
-  app.get(
-    "/comments",
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      try {
-        const query = paginationSchema.extend({
+  app.get("/comments", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const query = paginationSchema
+        .extend({
           userId: z.string().optional(),
           movieSlug: z.string().optional(),
-        }).parse(request.query);
+        })
+        .parse(request.query);
 
-        const result = await adminService.getComments(query);
+      const result = await adminService.getComments(query);
 
-        return reply.send({
-          success: true,
-          data: result.comments,
-          pagination: {
-            page: result.page,
-            limit: result.limit,
-            total: result.total,
-            totalPages: Math.ceil(result.total / result.limit),
-          },
-        });
-      } catch (error: any) {
-        if (error.name === "ZodError") {
-          return reply.status(400).send({
-            error: "Validation Error",
-            details: error.errors,
-          });
-        }
-        console.error("Get comments error:", error);
-        return reply.status(500).send({
-          error: "Internal Server Error",
-          message: "Không thể lấy danh sách bình luận",
+      return reply.send({
+        success: true,
+        data: result.comments,
+        pagination: {
+          page: result.page,
+          limit: result.limit,
+          total: result.total,
+          totalPages: Math.ceil(result.total / result.limit),
+        },
+      });
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return reply.status(400).send({
+          error: "Validation Error",
+          details: error.errors,
         });
       }
+      console.error("Get comments error:", error);
+      return reply.status(500).send({
+        error: "Internal Server Error",
+        message: "Không thể lấy danh sách bình luận",
+      });
     }
-  );
+  });
 
   /**
    * DELETE /api/v1/admin/comments/:commentId - Delete a comment
@@ -364,6 +534,6 @@ export async function adminRoutes(app: FastifyInstance) {
           message: "Không thể xóa bình luận",
         });
       }
-    }
+    },
   );
 }
