@@ -31,6 +31,8 @@ async function getApp() {
     moviesRoutes,
     notificationRoutes,
     streakRoutes,
+    favoriteRoutes,
+    collectionRoutes,
   } = await import("./routes/index.js");
 
   await registerJwt(app);
@@ -51,6 +53,8 @@ async function getApp() {
   await app.register(moviesRoutes, { prefix: "/api/v1/movies" });
   await app.register(notificationRoutes, { prefix: "/api/v1/notifications" });
   await app.register(streakRoutes, { prefix: "/api/v1/streak" });
+  await app.register(favoriteRoutes, { prefix: "/api/v1/favorites" });
+  await app.register(collectionRoutes, { prefix: "/api/v1/collections" });
 
   app.get("/health", async () => ({
     status: "ok",
