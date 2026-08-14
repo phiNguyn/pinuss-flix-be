@@ -27,3 +27,14 @@ export {
 } from "./notification.model.js";
 export { DailyCheckIn, IDailyCheckIn } from "./dailyCheckIn.model.js";
 export { UserBadge, IUserBadge } from "./userBadge.model.js";
+export {
+  Favorite,
+  IFavorite,
+  FavoriteSource,
+} from "./favorite.model.js";
+export {
+  Collection,
+  ICollection,
+  CollectionItem,
+  ICollectionItem,
+} from "./collection.model.js";

@@ -85,3 +85,20 @@ export {
   CheckInResult,
   StreakBadgeDto,
 } from "./streak.service.js";
+
+export {
+  favoriteService,
+  FavoriteService,
+  AddFavoriteDto,
+  FavoriteListResult,
+} from "./favorite.service.js";
+
+export {
+  collectionService,
+  CollectionService,
+  CreateCollectionDto,
+  UpdateCollectionDto,
+  AddMovieToCollectionDto,
+  CollectionWithItems,
+  CollectionListResult,
+} from "./collection.service.js";

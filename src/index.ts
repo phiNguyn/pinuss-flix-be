@@ -18,6 +18,8 @@ import {
   moviesRoutes,
   notificationRoutes,
   streakRoutes,
+  favoriteRoutes,
+  collectionRoutes,
 } from "./routes/index.js";
 
 const env = loadEnv();
@@ -60,6 +62,8 @@ async function build(): Promise<typeof app> {
   await app.register(moviesRoutes, { prefix: "/api/v1/movies" });
   await app.register(notificationRoutes, { prefix: "/api/v1/notifications" });
   await app.register(streakRoutes, { prefix: "/api/v1/streak" });
+  await app.register(favoriteRoutes, { prefix: "/api/v1/favorites" });
+  await app.register(collectionRoutes, { prefix: "/api/v1/collections" });
 
   app.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
@@ -83,6 +87,8 @@ async function build(): Promise<typeof app> {
         movies: "/api/v1/movies",
         notifications: "/api/v1/notifications",
         streak: "/api/v1/streak",
+        favorites: "/api/v1/favorites",
+        collections: "/api/v1/collections",
         health: "/health",
       },
     };

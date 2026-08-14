@@ -11,3 +11,5 @@ export { watchCalendarRoutes } from "./watchCalendar.routes.js";
 export { moviesRoutes } from "./movies.routes.js";
 export { notificationRoutes } from "./notification.routes.js";
 export { streakRoutes } from "./streak.routes.js";
+export { favoriteRoutes } from "./favorite.routes.js";
+export { collectionRoutes } from "./collection.routes.js";
