@@ -18,9 +18,12 @@ const paginationSchema = z.object({
 });
 
 const userListQuerySchema = paginationSchema.extend({
-  search: z.string().optional(),
+  s: z.string().optional(),
   role: z.enum(["user", "admin"]).optional(),
   isActive: z.coerce.boolean().optional(),
+  createdWithin: z.coerce.number().min(1).max(365).optional(),
+  lastLoginWithin: z.coerce.number().min(1).max(365).optional(),
+  hasCheckedInToday: z.coerce.boolean().optional(),
 });
 
 const updateRoleSchema = z.object({
@@ -532,6 +535,45 @@ export async function adminRoutes(app: FastifyInstance) {
         return reply.status(500).send({
           error: "Internal Server Error",
           message: "Không thể xóa bình luận",
+        });
+      }
+    },
+  );
+
+  // ========== CHECK-INS ==========
+
+  /**
+   * GET /api/v1/admin/check-ins/today - Get today's check-ins ranked by time
+   */
+  app.get(
+    "/check-ins/today",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const query = paginationSchema.parse(request.query);
+
+        const result = await adminService.getTodayCheckIns(query);
+
+        return reply.send({
+          success: true,
+          data: result.checkIns,
+          pagination: {
+            page: result.page,
+            limit: result.limit,
+            total: result.total,
+            totalPages: Math.ceil(result.total / result.limit),
+          },
+        });
+      } catch (error: any) {
+        if (error.name === "ZodError") {
+          return reply.status(400).send({
+            error: "Validation Error",
+            details: error.errors,
+          });
+        }
+        console.error("Get today check-ins error:", error);
+        return reply.status(500).send({
+          error: "Internal Server Error",
+          message: "Không thể lấy danh sách check-in hôm nay",
         });
       }
     },

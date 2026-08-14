@@ -22,6 +22,7 @@ export interface IUser extends Document {
   provider: Provider;
   googleId?: string;
   isActive: boolean;
+  lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -79,6 +80,9 @@ const userSchema = new Schema<IUser>(
       type: Boolean,
       default: true,
     },
+    lastLogin: {
+      type: Date,
+    },
   },
   {
     timestamps: true,
@@ -87,5 +91,7 @@ const userSchema = new Schema<IUser>(
 
 // Index for role-based queries
 userSchema.index({ role: 1 });
+// Index for lastLogin queries
+userSchema.index({ lastLogin: -1 });
 
 export const User = mongoose.model<IUser>("User", userSchema);

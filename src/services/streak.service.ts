@@ -1,5 +1,5 @@
 import { Types } from "mongoose";
-import { DailyCheckIn, UserBadge } from "../models/index.js";
+import { DailyCheckIn, UserBadge, User } from "../models/index.js";
 import { BADGE_DEFINITIONS, BadgeDefinition } from "../config/badges.config.js";
 import { notificationService } from "./notification.service.js";
 import { NotificationType } from "../models/notification.model.js";
@@ -47,6 +47,9 @@ export class StreakService {
       await DailyCheckIn.create({ userId: userObjectId, date: today });
       isNewCheckIn = true;
     }
+
+    // Update user's lastLogin
+    await User.findByIdAndUpdate(userObjectId, { lastLogin: new Date() });
 
     const profile = await this.getProfile(userId, timezone);
     let newlyUnlockedBadges: StreakBadgeDto[] = [];

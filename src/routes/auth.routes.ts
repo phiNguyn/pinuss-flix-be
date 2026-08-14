@@ -5,6 +5,7 @@ import {
   generateAccessToken,
   verifyRefreshToken,
 } from "../services/index.js";
+import { User } from "../models/index.js";
 import {
   registerSchema,
   loginSchema,
@@ -192,6 +193,33 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: [app.authenticate] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       return reply.send({ message: "Logged out successfully" });
+    },
+  );
+
+  /**
+   * POST /api/v1/auth/me/activity - Update user's last activity (lastLogin)
+   * Called when user opens the app to track recent access
+   */
+  app.post(
+    "/me/activity",
+    { preHandler: [app.authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const userId = (request as any).userId;
+
+        await User.findByIdAndUpdate(userId, { lastLogin: new Date() });
+
+        return reply.send({
+          success: true,
+          message: "Activity recorded",
+        });
+      } catch (error) {
+        console.error("Update activity error:", error);
+        return reply.status(500).send({
+          error: "Internal Server Error",
+          message: "Failed to update activity",
+        });
+      }
     },
   );
 }
