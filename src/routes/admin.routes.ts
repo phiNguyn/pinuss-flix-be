@@ -3,8 +3,9 @@ import {
   adminService,
   streakService,
   watchCalendarService,
+  notificationService,
 } from "../services/index.js";
-import { UserRole } from "../models/index.js";
+import { UserRole, NotificationType } from "../models/index.js";
 import { z } from "zod";
 import {
   calendarMonthQuerySchema,
@@ -574,6 +575,143 @@ export async function adminRoutes(app: FastifyInstance) {
         return reply.status(500).send({
           error: "Internal Server Error",
           message: "Không thể lấy danh sách check-in hôm nay",
+        });
+      }
+    },
+  );
+
+  // ========== NOTIFICATIONS ==========
+
+  const notificationListQuerySchema = paginationSchema.extend({
+    type: z.enum([
+      "comment_reply",
+      "leaderboard_overtake",
+      "rank_change",
+      "system",
+      "event",
+    ]).optional(),
+  });
+
+  const createNotificationSchema = z.object({
+    userIds: z.array(z.string().min(1)).min(1),
+    type: z.enum([
+      "comment_reply",
+      "leaderboard_overtake",
+      "rank_change",
+      "system",
+      "event",
+    ]),
+    title: z.string().min(1).max(200),
+    message: z.string().min(1).max(1000),
+    link: z.string().url().optional().or(z.string().max(0)),
+  });
+
+  /**
+   * GET /api/v1/admin/notifications - Get all notifications
+   */
+  app.get(
+    "/notifications",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const query = notificationListQuerySchema.parse(request.query);
+
+        const result = await notificationService.getAll({
+          page: query.page,
+          limit: query.limit,
+          type: query.type as NotificationType | undefined,
+        });
+
+        return reply.send({
+          success: true,
+          data: result.notifications,
+          pagination: {
+            page: result.page,
+            limit: result.limit,
+            total: result.total,
+            totalPages: Math.ceil(result.total / result.limit),
+          },
+        });
+      } catch (error: any) {
+        if (error.name === "ZodError") {
+          return reply.status(400).send({
+            error: "Validation Error",
+            details: error.errors,
+          });
+        }
+        console.error("Get notifications error:", error);
+        return reply.status(500).send({
+          error: "Internal Server Error",
+          message: "Không thể lấy danh sách thông báo",
+        });
+      }
+    },
+  );
+
+  /**
+   * GET /api/v1/admin/notifications/:id - Get notification detail
+   */
+  app.get(
+    "/notifications/:id",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { id } = request.params as { id: string };
+
+        const notification = await notificationService.getById(id);
+
+        if (!notification) {
+          return reply.status(404).send({
+            error: "Not Found",
+            message: "Thông báo không tồn tại",
+          });
+        }
+
+        return reply.send({
+          success: true,
+          data: notification,
+        });
+      } catch (error) {
+        console.error("Get notification detail error:", error);
+        return reply.status(500).send({
+          error: "Internal Server Error",
+          message: "Không thể lấy chi tiết thông báo",
+        });
+      }
+    },
+  );
+
+  /**
+   * POST /api/v1/admin/notifications - Create notification
+   */
+  app.post(
+    "/notifications",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const body = createNotificationSchema.parse(request.body);
+
+        const notification = await notificationService.create({
+          recipients: body.userIds,
+          type: body.type as NotificationType,
+          title: body.title,
+          message: body.message,
+          link: body.link || undefined,
+        });
+
+        return reply.status(201).send({
+          success: true,
+          message: `Đã gửi thông báo đến ${body.userIds.length} người dùng`,
+          data: { notificationId: notification._id, recipientCount: body.userIds.length },
+        });
+      } catch (error: any) {
+        if (error.name === "ZodError") {
+          return reply.status(400).send({
+            error: "Validation Error",
+            details: error.errors,
+          });
+        }
+        console.error("Create notification error:", error);
+        return reply.status(500).send({
+          error: "Internal Server Error",
+          message: "Không thể tạo thông báo",
         });
       }
     },

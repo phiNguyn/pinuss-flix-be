@@ -22,12 +22,16 @@ export interface INotificationMetadata {
 }
 
 export interface INotification extends Document {
-  userId: mongoose.Types.ObjectId;
   type: NotificationType;
   title: string;
   message: string;
   link?: string;
-  read: boolean;
+  userId?: mongoose.Types.ObjectId;
+  recipients: mongoose.Types.ObjectId[];
+  readBy: Array<{
+    userId: mongoose.Types.ObjectId;
+    readAt: Date;
+  }>;
   metadata?: INotificationMetadata;
   createdAt: Date;
   updatedAt: Date;
@@ -35,12 +39,6 @@ export interface INotification extends Document {
 
 const notificationSchema = new Schema<INotification>(
   {
-    userId: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
     type: {
       type: String,
       required: true,
@@ -63,11 +61,26 @@ const notificationSchema = new Schema<INotification>(
       type: String,
       trim: true,
     },
-    read: {
-      type: Boolean,
-      default: false,
-      index: true,
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
     },
+    recipients: [{
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    }],
+    readBy: [{
+      userId: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+      },
+      readAt: {
+        type: Date,
+        default: Date.now,
+      },
+    }],
     metadata: {
       actorId: String,
       actorName: String,
@@ -86,8 +99,8 @@ const notificationSchema = new Schema<INotification>(
   },
 );
 
-notificationSchema.index({ userId: 1, createdAt: -1 });
-notificationSchema.index({ userId: 1, read: 1, createdAt: -1 });
+notificationSchema.index({ recipients: 1, createdAt: -1 });
+notificationSchema.index({ "readBy.userId": 1 });
 
 export const Notification = mongoose.model<INotification>(
   "Notification",

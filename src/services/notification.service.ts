@@ -7,7 +7,8 @@ import {
 import { Types } from "mongoose";
 
 export interface CreateNotificationDto {
-  userId: string;
+  userId?: string;
+  recipients: string[];
   type: NotificationType;
   title: string;
   message: string;
@@ -15,8 +16,21 @@ export interface CreateNotificationDto {
   metadata?: INotificationMetadata;
 }
 
+export interface NotificationResponse {
+  _id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  link?: string;
+  userId?: string;
+  read: boolean;
+  metadata?: INotificationMetadata;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface NotificationListResult {
-  notifications: INotification[];
+  notifications: NotificationResponse[];
   total: number;
   page: number;
   limit: number;
@@ -25,14 +39,25 @@ export interface NotificationListResult {
 
 export class NotificationService {
   async create(data: CreateNotificationDto): Promise<INotification> {
+    if (!data.recipients || data.recipients.length === 0) {
+      throw new Error("At least one recipient is required");
+    }
+
+    for (const recipient of data.recipients) {
+      if (!Types.ObjectId.isValid(recipient)) {
+        throw new Error(`Invalid recipient ID: ${recipient}`);
+      }
+    }
+
     const notification = new Notification({
-      userId: new Types.ObjectId(data.userId),
       type: data.type,
       title: data.title,
       message: data.message,
       link: data.link,
       metadata: data.metadata,
-      read: false,
+      userId: new Types.ObjectId(data.recipients[0]),
+      recipients: data.recipients.map((id) => new Types.ObjectId(id)),
+      readBy: [],
     });
 
     return notification.save();
@@ -57,8 +82,9 @@ export class NotificationService {
         ? `${params.replyPreview.slice(0, 80)}...`
         : params.replyPreview;
 
-    return this.create({
-      userId: params.recipientUserId,
+    const notification = new Notification({
+      userId: new Types.ObjectId(params.recipientUserId),
+      recipients: [new Types.ObjectId(params.recipientUserId)],
       type: NotificationType.COMMENT_REPLY,
       title: `${params.actorName} đã trả lời bình luận của bạn`,
       message: preview,
@@ -71,7 +97,10 @@ export class NotificationService {
         commentId: params.commentId,
         parentCommentId: params.parentCommentId,
       },
+      readBy: [],
     });
+
+    return notification.save();
   }
 
   async getByUserId(
@@ -84,34 +113,50 @@ export class NotificationService {
   ): Promise<NotificationListResult> {
     const { page = 1, limit = 20, unreadOnly = false } = options;
     const skip = (page - 1) * limit;
+    const userObjectId = new Types.ObjectId(userId);
 
     const filter: Record<string, unknown> = {
-      userId: new Types.ObjectId(userId),
+      $or: [{ userId: userObjectId }, { recipients: userObjectId }],
     };
 
     if (unreadOnly) {
-      filter.read = false;
+      filter["readBy.userId"] = { $ne: userObjectId };
     }
 
     const [notifications, total, unreadCount] = await Promise.all([
-      Notification.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
+      Notification.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
       Notification.countDocuments(filter),
       Notification.countDocuments({
-        userId: new Types.ObjectId(userId),
-        read: false,
+        $or: [{ userId: userObjectId }, { recipients: userObjectId }],
+        "readBy.userId": { $ne: userObjectId },
       }),
     ]);
 
-    return { notifications, total, page, limit, unreadCount };
+    const transformed: NotificationResponse[] = notifications.map((n) => {
+      const isRead = n.readBy.some((r) => r.userId.toString() === userId);
+      const obj = n.toObject();
+      return {
+        _id: obj._id.toString(),
+        type: obj.type,
+        title: obj.title,
+        message: obj.message,
+        link: obj.link,
+        userId: obj.userId?.toString(),
+        metadata: obj.metadata,
+        createdAt: obj.createdAt.toISOString(),
+        updatedAt: obj.updatedAt.toISOString(),
+        read: isRead,
+      };
+    });
+
+    return { notifications: transformed, total, page, limit, unreadCount };
   }
 
   async getUnreadCount(userId: string): Promise<number> {
+    const userObjectId = new Types.ObjectId(userId);
     return Notification.countDocuments({
-      userId: new Types.ObjectId(userId),
-      read: false,
+      $or: [{ userId: userObjectId }, { recipients: userObjectId }],
+      "readBy.userId": { $ne: userObjectId },
     });
   }
 
@@ -123,26 +168,96 @@ export class NotificationService {
       return null;
     }
 
-    return Notification.findOneAndUpdate(
-      {
-        _id: new Types.ObjectId(notificationId),
-        userId: new Types.ObjectId(userId),
-      },
-      { $set: { read: true } },
-      { new: true },
+    const notification = await Notification.findOne({
+      _id: new Types.ObjectId(notificationId),
+      $or: [
+        { userId: new Types.ObjectId(userId) },
+        { recipients: new Types.ObjectId(userId) },
+      ],
+    });
+
+    if (!notification) {
+      return null;
+    }
+
+    const alreadyRead = notification.readBy.some(
+      (r) => r.userId.toString() === userId,
     );
+
+    if (!alreadyRead) {
+      notification.readBy.push({
+        userId: new Types.ObjectId(userId),
+        readAt: new Date(),
+      });
+      await notification.save();
+    }
+
+    return notification;
   }
 
   async markAllAsRead(userId: string): Promise<number> {
-    const result = await Notification.updateMany(
+    const userObjectId = new Types.ObjectId(userId);
+
+    const updateResult = await Notification.updateMany(
       {
-        userId: new Types.ObjectId(userId),
-        read: false,
+        $or: [{ userId: userObjectId }, { recipients: userObjectId }],
+        "readBy.userId": { $ne: userObjectId },
       },
-      { $set: { read: true } },
+      {
+        $push: {
+          readBy: {
+            userId: userObjectId,
+            readAt: new Date(),
+          },
+        },
+      },
     );
 
-    return result.modifiedCount;
+    return updateResult.modifiedCount;
+  }
+
+  async getAll(
+    options: {
+      page?: number;
+      limit?: number;
+      type?: NotificationType;
+    } = {},
+  ): Promise<{
+    notifications: INotification[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const { page = 1, limit = 20, type } = options;
+    const skip = (page - 1) * limit;
+
+    const filter: Record<string, unknown> = {};
+    if (type) {
+      filter.type = type;
+    }
+
+    const [notifications, total] = await Promise.all([
+      Notification.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("userId", "name email avatar")
+        .populate("recipients", "name email avatar")
+        .populate("readBy.userId", "name email avatar"),
+      Notification.countDocuments(filter),
+    ]);
+
+    return { notifications, total, page, limit };
+  }
+
+  async getById(notificationId: string): Promise<INotification | null> {
+    if (!Types.ObjectId.isValid(notificationId)) {
+      return null;
+    }
+
+    return Notification.findById(notificationId)
+      .populate("recipients", "name email avatar")
+      .populate("readBy.userId", "name email avatar");
   }
 }
 

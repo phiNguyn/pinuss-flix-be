@@ -25,16 +25,16 @@ import {
 const env = loadEnv();
 
 const app = Fastify({
-  logger: {
-    level: "info",
-    transport: {
-      target: "pino-pretty",
-      options: {
-        translateTime: "HH:MM:ss Z",
-        ignore: "pid,hostname",
-      },
-    },
-  },
+  // logger: {
+  //   level: "info",
+  //   transport: {
+  //     target: "pino-pretty",
+  //     options: {
+  //       translateTime: "HH:MM:ss Z",
+  //       ignore: "pid,hostname",
+  //     },
+  //   },
+  // },
 });
 
 async function build(): Promise<typeof app> {

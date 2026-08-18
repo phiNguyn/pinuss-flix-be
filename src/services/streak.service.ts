@@ -147,6 +147,7 @@ export class StreakService {
     }).lean();
 
     const existingIds = new Set(existing.map((b) => b.badgeId));
+
     const toAward = eligible.filter((b) => !existingIds.has(b.id));
 
     if (toAward.length === 0) {
@@ -173,18 +174,14 @@ export class StreakService {
     }));
 
     for (const badge of toAward) {
-      notificationService
-        .create({
-          userId,
-          type: NotificationType.EVENT,
-          title: `🏅 Huy hiệu mới: ${badge.name}`,
-          message: badge.description,
-          link: "/",
-          metadata: { eventId: badge.id },
-        })
-        .catch((err) =>
-          console.error("Failed to send badge notification:", err),
-        );
+      notificationService.create({
+        recipients: [userId],
+        type: NotificationType.EVENT,
+        title: `🏅 Huy hiệu mới: ${badge.name}`,
+        message: badge.description,
+        link: "/",
+        metadata: { eventId: badge.id },
+      });
     }
 
     return unlocked;
