@@ -13,3 +13,4 @@ export { notificationRoutes } from "./notification.routes.js";
 export { streakRoutes } from "./streak.routes.js";
 export { favoriteRoutes } from "./favorite.routes.js";
 export { collectionRoutes } from "./collection.routes.js";
+export { analyticsRoutes } from "./analytics.routes.js";

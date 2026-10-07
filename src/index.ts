@@ -20,6 +20,7 @@ import {
   streakRoutes,
   favoriteRoutes,
   collectionRoutes,
+  analyticsRoutes,
 } from "./routes/index.js";
 
 const env = loadEnv();
@@ -64,6 +65,7 @@ async function build(): Promise<typeof app> {
   await app.register(streakRoutes, { prefix: "/api/v1/streak" });
   await app.register(favoriteRoutes, { prefix: "/api/v1/favorites" });
   await app.register(collectionRoutes, { prefix: "/api/v1/collections" });
+  await app.register(analyticsRoutes, { prefix: "/api/v1/analytics" });
 
   app.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
@@ -89,6 +91,7 @@ async function build(): Promise<typeof app> {
         streak: "/api/v1/streak",
         favorites: "/api/v1/favorites",
         collections: "/api/v1/collections",
+        analytics: "/api/v1/analytics",
         health: "/health",
       },
     };
